@@ -40,11 +40,18 @@ recoverable. The runner creates an external worktree and a branch named
   approval requests, ambiguity, failed verification, and merge or publish intent
   pause safely.
 - `unattended` is an explicit opt-in that suppresses routine approval prompts and
-  continues through automatic review where supported. It still stops on failures
-  and risk signals, and never merges or publishes automatically.
+  continues through automatic review where supported. Its initial invocation
+  uses `--approve-for-me` without `--sandbox`; the current CLI rejects that
+  combination. Native resume uses equivalent `workspace-write`,
+  `approval_policy=on-request`, and `approvals_reviewer=auto_review` config
+  overrides because resume does not accept `--approve-for-me`. It still stops
+  on failures and risk signals, and never merges or publishes automatically.
 - `on-request` passes through Codex's normal approval policy.
 - `auto_review` requests automatic review where the CLI supports it.
-- `never` disables Codex approval prompts and is an advanced bypass.
+- `never` is a separate advanced unattended mode that uses
+  `--dangerously-bypass-approvals-and-sandbox`. Never combine it with
+  `--approve-for-me` or `--sandbox`; it does not authorize pushing, merging,
+  or publishing.
 
 ## Context pressure and recovery
 

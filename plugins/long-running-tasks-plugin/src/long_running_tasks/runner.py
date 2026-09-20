@@ -14,7 +14,15 @@ import uuid
 from pathlib import Path
 from typing import Callable
 
-from .codex_exec import APPROVAL_MODES, CodexExecutor, CodexResult
+from .codex_exec import (
+    APPROVAL_MODES,
+    CodexError,
+    CodexExecutor,
+    CodexResult,
+    build_exec_command,
+    build_resume_command,
+    preflight_command,
+)
 from .git_ops import (
     GitError,
     changed_paths,
@@ -191,6 +199,7 @@ class RunManager:
     ):
         self.store = store or RunStore()
         self.worker_backend = worker_backend or ("inline" if executor_factory else "process")
+        self._preflight_enabled = executor_factory is None
         if self.worker_backend not in {"inline", "process"}:
             raise ValueError(f"Unsupported worker backend: {self.worker_backend}")
         self.executor_factory = executor_factory or (
@@ -240,6 +249,12 @@ class RunManager:
         plan = parse_plan(root / "PLAN.md")
         if plan.next_item is None:
             raise RunError("PLAN.md is already complete")
+        self._preflight_codex(
+            worktree=root,
+            approval_mode=approval_mode,
+            model=model,
+            session_id=None,
+        )
         repo_key = repository_key(root)
         run_id = uuid.uuid4().hex[:12]
         snapshot_path = self.store.write_snapshot(run_id, task.text, task.digest)
@@ -304,6 +319,45 @@ class RunManager:
         self.store.get(run_id)
         return self.store.read_logs(run_id, limit=limit, cursor=cursor)
 
+    def _preflight_codex(
+        self,
+        *,
+        worktree: Path,
+        approval_mode: str,
+        model: str | None,
+        session_id: str | None,
+    ) -> None:
+        """Reject unsupported Codex commands before persistent run mutation."""
+        if not self._preflight_enabled:
+            return
+        output_file = self.store.root / "preflight.last-message.txt"
+        if session_id:
+            command = build_resume_command(
+                session_id=session_id,
+                worktree=worktree,
+                output_file=output_file,
+                approval_mode=approval_mode,
+                model=model,
+            )
+        else:
+            command = build_exec_command(
+                worktree=worktree,
+                output_file=output_file,
+                approval_mode=approval_mode,
+                model=model,
+            )
+        try:
+            preflight_command(
+                command,
+                approval_mode=approval_mode,
+                resume=session_id is not None,
+            )
+        except (CodexError, OSError, subprocess.SubprocessError) as exc:
+            phase = "resume" if session_id else "initial"
+            raise RunError(
+                f"Codex {phase} command preflight failed for approval_mode={approval_mode!r}: {exc}"
+            ) from exc
+
     def resume(self, run_id: str, *, approval_mode: str | None = None) -> dict:
         run = self.store.get(run_id)
         if run["status"] not in RESTARTABLE_STATUSES:
@@ -314,6 +368,12 @@ class RunManager:
             if approval_mode not in APPROVAL_MODES:
                 raise RunError(f"Unsupported approval mode: {approval_mode}")
             run["approval_mode"] = approval_mode
+        self._preflight_codex(
+            worktree=Path(run["worktree_path"]),
+            approval_mode=run["approval_mode"],
+            model=run.get("model"),
+            session_id=run.get("session_id"),
+        )
         self.store.acquire_repo_lock(run["repo_key"], run_id)
         state = _load_state(run)
         state["approval_mode"] = run["approval_mode"]

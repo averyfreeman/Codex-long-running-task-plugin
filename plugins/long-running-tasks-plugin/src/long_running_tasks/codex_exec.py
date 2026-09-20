@@ -15,6 +15,7 @@ from typing import Callable
 
 
 APPROVAL_MODES = {"policy", "on-request", "auto_review", "never", "unattended"}
+_DANGEROUS_BYPASS_FLAG = "--dangerously-bypass-approvals-and-sandbox"
 
 
 class CodexError(RuntimeError):
@@ -42,14 +43,135 @@ def ensure_codex() -> str:
     return executable
 
 
-def _approval_policy(mode: str, *, resume: bool) -> str:
+def _validate_approval_mode(mode: str) -> None:
     if mode not in APPROVAL_MODES:
         raise ValueError(f"Unsupported approval mode: {mode}")
-    if mode in {"never", "unattended"}:
-        return "never"
+
+
+def approval_arguments(mode: str, *, resume: bool) -> list[str]:
+    """Return the CLI approval/sandbox arguments for one plugin mode.
+
+    ``--approve-for-me`` and ``--sandbox`` are mutually exclusive in the
+    current Codex CLI. The resume command does not accept
+    ``--approve-for-me``, so unattended continuation uses its equivalent
+    automatic-review configuration explicitly.
+    """
+    _validate_approval_mode(mode)
+    if mode in {"policy", "on-request"}:
+        if resume:
+            return ["-c", "sandbox_mode=workspace-write", "-c", "approval_policy=on-request"]
+        return ["--sandbox", "workspace-write", "-c", "approval_policy=on-request"]
     if mode == "auto_review":
-        return "never" if resume else "on-request"
-    return "on-request"
+        if resume:
+            return [
+                "-c",
+                "sandbox_mode=workspace-write",
+                "-c",
+                "approval_policy=on-request",
+                "-c",
+                "approvals_reviewer=auto_review",
+            ]
+        return [
+            "--sandbox",
+            "workspace-write",
+            "-c",
+            "approval_policy=on-request",
+            "-c",
+            "approvals_reviewer=auto_review",
+        ]
+    if mode == "unattended":
+        if resume:
+            return [
+                "-c",
+                "sandbox_mode=workspace-write",
+                "-c",
+                "approval_policy=on-request",
+                "-c",
+                "approvals_reviewer=auto_review",
+            ]
+        return ["--approve-for-me"]
+    return [_DANGEROUS_BYPASS_FLAG]
+
+
+def validate_command_compatibility(command: list[str]) -> None:
+    """Reject approval/sandbox flag combinations the Codex CLI cannot parse."""
+    def has_option(option: str) -> bool:
+        return any(token == option or token.startswith(f"{option}=") for token in command)
+
+    approve_for_me = has_option("--approve-for-me")
+    sandbox = has_option("--sandbox")
+    dangerous_bypass = has_option(_DANGEROUS_BYPASS_FLAG)
+    if approve_for_me and sandbox:
+        raise CodexError("--approve-for-me cannot be combined with --sandbox")
+    if approve_for_me and dangerous_bypass:
+        raise CodexError(
+            "--approve-for-me cannot be combined with --dangerously-bypass-approvals-and-sandbox"
+        )
+    if sandbox and dangerous_bypass:
+        raise CodexError(
+            "--sandbox cannot be combined with --dangerously-bypass-approvals-and-sandbox"
+        )
+
+
+def _parser_check_command(command: list[str]) -> list[str]:
+    """Build a no-execution parser check from a runtime command."""
+    checked: list[str] = []
+    skip_next = False
+    for token in command:
+        if skip_next:
+            skip_next = False
+            continue
+        if token in {"-C", "--output-last-message"}:
+            skip_next = True
+            continue
+        if token == "-":
+            continue
+        checked.append(token)
+    checked.append("--help")
+    return checked
+
+
+def preflight_command(
+    command: list[str],
+    *,
+    approval_mode: str,
+    resume: bool,
+    timeout_seconds: float = 15,
+) -> str:
+    """Validate the installed Codex executable and exact command grammar."""
+    validate_command_compatibility(command)
+    executable = ensure_codex()
+    version_result = subprocess.run(
+        [executable, "--version"],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=timeout_seconds,
+        check=False,
+    )
+    version_output = (version_result.stdout or version_result.stderr).strip()
+    if version_result.returncode != 0:
+        raise CodexError(
+            f"Codex version check failed with exit code {version_result.returncode}: "
+            f"{version_output[-1000:]}"
+        )
+    parser_command = _parser_check_command([executable, *command[1:]])
+    parser_result = subprocess.run(
+        parser_command,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=timeout_seconds,
+        check=False,
+    )
+    if parser_result.returncode != 0:
+        detail = (parser_result.stderr or parser_result.stdout).strip()
+        phase = "resume" if resume else "initial"
+        raise CodexError(
+            f"Codex rejected the {phase} command for approval_mode={approval_mode!r} "
+            f"during preflight (exit code {parser_result.returncode}): {detail[-1000:]}"
+        )
+    return version_output.splitlines()[0] if version_output else "unknown"
 
 
 def build_exec_command(
@@ -63,20 +185,16 @@ def build_exec_command(
         "codex",
         "exec",
         "--json",
-        "--sandbox",
-        "workspace-write",
-        "-c",
-        f"approval_policy={_approval_policy(approval_mode, resume=False)}",
+        *approval_arguments(approval_mode, resume=False),
         "-C",
         str(worktree),
         "--output-last-message",
         str(output_file),
     ]
-    if approval_mode in {"auto_review", "unattended"}:
-        command.append("--approve-for-me")
     if model:
         command.extend(["--model", model])
     command.append("-")
+    validate_command_compatibility(command)
     return command
 
 
@@ -94,16 +212,14 @@ def build_resume_command(
         "resume",
         session_id,
         "--json",
-        "-c",
-        "sandbox_mode=workspace-write",
-        "-c",
-        f"approval_policy={_approval_policy(approval_mode, resume=True)}",
+        *approval_arguments(approval_mode, resume=True),
         "--output-last-message",
         str(output_file),
     ]
     if model:
         command.extend(["--model", model])
     command.append("-")
+    validate_command_compatibility(command)
     return command
 
 
@@ -224,6 +340,11 @@ class CodexExecutor:
             )
         )
         command[0] = executable
+        preflight_command(
+            command,
+            approval_mode=approval_mode,
+            resume=session_id is not None,
+        )
         output_file.parent.mkdir(parents=True, exist_ok=True)
         process = subprocess.Popen(
             command,

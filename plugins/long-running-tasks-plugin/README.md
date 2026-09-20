@@ -144,10 +144,27 @@ actions.
 ~~~
 
 It still stops on failure, risk, ambiguity, approval signals, or merge/publish
-intent. It never pushes, merges, or publishes automatically. The raw
-`on-request`, `auto_review`, and `never` modes remain available for compatibility;
-`never` is an advanced approval bypass and should be used only when its risks
-are understood.
+intent. It never pushes, merges, or publishes automatically. The launcher uses
+`--approve-for-me` without an explicit `--sandbox` flag; current Codex CLI
+rejects those two flags together. On native session resume, the plugin uses
+the equivalent `workspace-write` plus `approvals_reviewer=auto_review`
+configuration because `codex exec resume` does not accept
+`--approve-for-me`.
+
+`never` is a separate, advanced unattended mode:
+
+~~~json
+{
+  "repo_path": "/absolute/path/to/repo",
+  "approval_mode": "never"
+}
+~~~
+
+It uses `--dangerously-bypass-approvals-and-sandbox` and therefore disables
+Codex's approval and sandbox controls. Never combine that flag with
+`--approve-for-me` or `--sandbox`. The runner's own risk gates and its
+no-push/no-merge/no-publish policy still apply. The raw `on-request` and
+`auto_review` modes remain available for compatibility.
 
 ## Checkpoints, continuation, and recovery
 

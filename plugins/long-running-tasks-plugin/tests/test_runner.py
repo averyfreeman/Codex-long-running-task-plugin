@@ -60,6 +60,11 @@ import pathlib
 import sys
 import time
 
+if '--version' in sys.argv:
+    print('codex-cli fake')
+    raise SystemExit(0)
+if '--help' in sys.argv:
+    raise SystemExit(0)
 prompt = sys.stdin.read()
 mode = os.environ.get('FAKE_CODEX_MODE', 'success')
 print(json.dumps({'type': 'thread.started', 'thread_id': 'fake-session'}), flush=True)
@@ -101,6 +106,25 @@ def manager_for(tmp_path: Path, mode: str = "success", verification_timeout: flo
         verification_timeout_seconds=verification_timeout,
         codex_timeout_seconds=4,
     )
+
+
+def test_start_preflight_failure_creates_no_persistent_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    repo = make_repo(tmp_path)
+    store = RunStore(tmp_path / "runtime")
+
+    def fail_preflight(*args, **kwargs):
+        raise runner_module.CodexError(
+            "--approve-for-me cannot be combined with --sandbox"
+        )
+
+    monkeypatch.setattr(runner_module, "preflight_command", fail_preflight)
+    manager = RunManager(store=store, worker_backend="inline")
+    with pytest.raises(RunError, match="preflight failed"):
+        manager.start(str(repo), approval_mode="unattended")
+
+    assert not list(store.runs_dir.glob("*.json"))
+    assert not list((store.root / "worktrees").glob("*"))
+    assert not list(store.locks_dir.glob("*.json"))
 
 
 def test_successful_slice_isolated_and_checkpointed(tmp_path: Path):
