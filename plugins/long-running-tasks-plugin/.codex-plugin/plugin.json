@@ -1,0 +1,23 @@
+{
+  "name": "long-running-tasks-plugin",
+  "version": "0.1.0",
+  "description": "Run explicit repository tasks as isolated, verifiable, recoverable Codex slices.",
+  "author": {
+    "name": "Avery Freeman"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Long-Running Tasks",
+    "shortDescription": "Run isolated, verifiable Codex task slices.",
+    "longDescription": "Long-Running Tasks orchestrates explicit TASK.md and PLAN.md work through isolated Git worktrees, verification gates, checkpoints, recovery, and async MCP status tools.",
+    "developerName": "Avery Freeman",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Async task orchestration",
+      "Git checkpointing",
+      "Run recovery"
+    ],
+    "defaultPrompt": "Use long-running task orchestration for this explicit repository task."
+  },
+  "mcpServers": "./.mcp.json"
+}

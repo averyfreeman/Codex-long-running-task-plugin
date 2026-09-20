@@ -1,0 +1,31 @@
+[project]
+name = "long-running-tasks-plugin"
+version = "0.1.0"
+description = "Isolated, verifiable, recoverable Codex task orchestration."
+readme = "README.md"
+authors = [{ name = "Avery Freeman" }]
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = [
+  "mcp>=1.12,<2",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3,<9",
+]
+
+[project.scripts]
+long-running-tasks = "long_running_tasks.cli:main"
+long-running-tasks-mcp = "long_running_tasks.mcp_server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/long_running_tasks"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

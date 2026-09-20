@@ -1,0 +1,22 @@
+{
+  "name": "long-running-tasks-plugin-marketplace",
+  "interface": {
+    "displayName": "Long Running Tasks Plugin"
+  },
+  "plugins": [
+    {
+      "name": "long-running-tasks-plugin",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/averyfreeman/Codex-long-running-task-plugin.git",
+        "path": "./plugins/long-running-tasks-plugin",
+        "ref": "v0.1.0"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
