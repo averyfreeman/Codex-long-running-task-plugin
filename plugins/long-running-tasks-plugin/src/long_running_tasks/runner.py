@@ -65,8 +65,14 @@ APPROVAL_SIGNAL_RE = re.compile(r"(?:RUNNER_STATUS|CODEX_RUNNER)\s*[:=]\s*(?:NEE
 RISK_COMMAND_RE = re.compile(
     r"(?:\bgit\s+(?:push|merge|rebase|reset|clean)\b|"
     r"\b(?:rm|sudo|chmod|chown)\s+|"
-    r"\b(?:terraform\s+destroy|kubectl\s+delete|drop\s+(?:database|table)|"
-    r"publish|release)\b)",
+    r"\b(?:terraform\s+destroy|kubectl\s+delete|drop\s+(?:database|table))\b|"
+    r"(?<![\w-])(?:publish|release)(?=\s|$|[;&|]))",
+    re.IGNORECASE,
+)
+RISK_OUTPUT_RE = re.compile(
+    r"(?:\bgit\s+(?:push|merge|rebase|reset|clean)\b|"
+    r"\b(?:rm|sudo|chmod|chown)\s+|"
+    r"\b(?:terraform\s+destroy|kubectl\s+delete|drop\s+(?:database|table))\b)",
     re.IGNORECASE,
 )
 ACTIVE_STATUSES = {"queued", "running", "verifying", "checkpointing", "cancelling"}
@@ -130,13 +136,14 @@ def _risk_flags(worktree: Path, result: CodexResult | None = None) -> list[str]:
         if suffix in RISK_SUFFIXES or Path(normalized).name.startswith(".env"):
             flags.append(f"secret-like-path:{normalized}")
     if result:
-        combined = f"{result.stdout}\n{result.stderr}"
-        if APPROVAL_SIGNAL_RE.search(combined):
+        if APPROVAL_SIGNAL_RE.search(result.stdout) or APPROVAL_SIGNAL_RE.search(result.stderr):
             flags.append("explicit-runner-approval-signal")
-        if RISK_COMMAND_RE.search(combined):
+        if RISK_OUTPUT_RE.search(result.stdout) or RISK_OUTPUT_RE.search(result.stderr):
             flags.append("risky-command-intent")
         for event in result.events:
-            if RISK_COMMAND_RE.search(json.dumps(event, sort_keys=True)):
+            item = event.get("item") if isinstance(event, dict) else None
+            command = item.get("command") if isinstance(item, dict) else None
+            if isinstance(command, str) and RISK_COMMAND_RE.search(command):
                 flags.append("risky-tool-event")
     return sorted(set(flags))
 
@@ -405,6 +412,10 @@ class RunManager:
         self._ensure_task_snapshot(run)
         self.store.acquire_repo_lock(run["repo_key"], run_id)
         state = _load_state(run)
+        if run["status"] in RESTARTABLE_STATUSES and run.get("max_iterations"):
+            max_iterations = int(run["max_iterations"])
+            if max_iterations and int(run.get("iteration", 0)) >= max_iterations:
+                run["iteration"] = max(0, int(run.get("iteration", 0)) - 1)
         state["approval_mode"] = run["approval_mode"]
         transition(state, "queued")
         _write_state(run, state)
@@ -838,7 +849,9 @@ class RunManager:
                     self._set_status(run_id, "needs_recovery", reason="Codex modified TASK.md or PLAN.md outside the runner contract")
                     return
                 after_paths = _implementation_paths(worktree)
-                if after_paths == before_paths:
+                # A resumed run may already contain retained implementation changes
+                # from a worker that stopped before reaching its checkpoint boundary.
+                if after_paths == before_paths and not after_paths:
                     self._set_status(run_id, "failed", reason="Codex completed without implementation changes")
                     return
                 self._set_status(run_id, "verifying", reason=f"running verification for {item.task_id}")

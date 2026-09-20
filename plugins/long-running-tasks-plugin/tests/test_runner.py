@@ -191,6 +191,59 @@ def test_verification_failure_creates_no_checkpoint(tmp_path: Path):
     assert not list(worktree.glob(".git/refs/tags/**"))
 
 
+def test_resume_checkpoints_retained_implementation_changes(tmp_path: Path):
+    repo = make_repo(tmp_path)
+
+    class RetainedImplementationExecutor:
+        def __init__(self):
+            self.calls = 0
+
+        def run(self, *, worktree, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                Path(worktree, "marker.txt").write_text("retained\n", encoding="utf-8")
+                return CodexResult(
+                    returncode=7,
+                    session_id="failed-session",
+                    context_ratio=0.1,
+                    context_pressure=False,
+                    approval_requested=False,
+                    cancelled=False,
+                    timed_out=False,
+                    stdout="",
+                    stderr="",
+                )
+            return CodexResult(
+                returncode=0,
+                session_id="resumed-session",
+                context_ratio=0.1,
+                context_pressure=False,
+                approval_requested=False,
+                cancelled=False,
+                timed_out=False,
+                stdout="",
+                stderr="",
+            )
+
+    executor = RetainedImplementationExecutor()
+    manager = RunManager(
+        store=RunStore(tmp_path / "runtime"),
+        executor_factory=lambda: executor,
+        verification_timeout_seconds=5,
+    )
+    run = manager.start(str(repo), max_iterations=1)
+    failed = wait_for(manager, run["run_id"], {"failed", "completed", "needs_recovery"})
+    assert failed["status"] == "failed"
+    while manager._worker_is_alive(run["run_id"]):
+        time.sleep(0.01)
+
+    resumed = manager.resume(run["run_id"])
+    result = wait_for(manager, run["run_id"], {"completed", "failed", "needs_recovery"})
+
+    assert resumed["run_id"] == run["run_id"]
+    assert result["status"] == "completed"
+
+
 def test_approval_pauses_without_checkpoint(tmp_path: Path):
     repo = make_repo(tmp_path)
     manager = manager_for(tmp_path, mode="approval")
@@ -199,6 +252,31 @@ def test_approval_pauses_without_checkpoint(tmp_path: Path):
 
     assert result["status"] == "needs_approval"
     assert result["last_checkpoint"] is None
+
+
+def test_risk_flags_ignore_release_filenames_and_prose(tmp_path: Path):
+    repo = make_repo(tmp_path)
+    result = CodexResult(
+        returncode=0,
+        session_id="safe-session",
+        context_ratio=0.1,
+        context_pressure=False,
+        approval_requested=False,
+        cancelled=False,
+        timed_out=False,
+        stdout="candidate release evidence is ready",
+        stderr="",
+        events=[
+            {
+                "item": {
+                    "type": "command_execution",
+                    "command": "pwsh scripts/run-release-candidate-gates.ps1",
+                }
+            }
+        ],
+    )
+
+    assert runner_module._risk_flags(repo, result) == []
 
 
 class SequenceExecutor:
