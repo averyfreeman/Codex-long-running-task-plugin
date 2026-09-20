@@ -4,8 +4,11 @@ import json
 import os
 import tempfile
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+
+import fcntl
 
 from .state import utc_now
 
@@ -77,6 +80,21 @@ class RunStore:
 
     def worker_lock_path(self, run_id: str) -> Path:
         return self.workers_dir / f"{run_id}.lock"
+
+    def checkpoint_lock_path(self, run_id: str) -> Path:
+        return self.workers_dir / f"{run_id}.checkpoint.lock"
+
+    @contextmanager
+    def checkpoint_guard(self, run_id: str):
+        """Serialize cancellation with the checkpoint commit/tag boundary."""
+        path = self.checkpoint_lock_path(run_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a+", encoding="utf-8") as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def write(self, run: dict) -> None:
         run = dict(run)

@@ -332,15 +332,16 @@ class RunManager:
     def cancel(self, run_id: str, *, confirm: bool = False) -> dict:
         if not confirm:
             raise RunError("Cancellation requires confirm=true")
-        run = self.store.get(run_id)
-        if run["status"] in TERMINAL_STATUSES:
-            return run
-        run["cancel_requested"] = True
-        if run["status"] not in {"checkpointing", "cancelling"}:
-            self._set_status(run_id, "cancelling", reason="cancellation requested")
-        else:
-            self.store.write(run)
-        self.store.append_log(run_id, {"kind": "cancellation_requested", "message": "Cancellation requested by user"})
+        with self.store.checkpoint_guard(run_id):
+            run = self.store.get(run_id)
+            if run["status"] in TERMINAL_STATUSES:
+                return run
+            run["cancel_requested"] = True
+            if run["status"] not in {"checkpointing", "cancelling"}:
+                self._set_status(run_id, "cancelling", reason="cancellation requested")
+            else:
+                self.store.write(run)
+            self.store.append_log(run_id, {"kind": "cancellation_requested", "message": "Cancellation requested by user"})
         event = self._cancel_events.get(run_id)
         if event:
             event.set()
@@ -881,6 +882,10 @@ selected plan item. The runner still owns verification, PLAN.md, commit, and tag
         return path
 
     def _checkpoint(self, run_id: str, task: TaskSpec, plan: PlanSpec, task_id: str, allowed_paths: list[str]) -> None:
+        with self.store.checkpoint_guard(run_id):
+            self._checkpoint_locked(run_id, task, plan, task_id, allowed_paths)
+
+    def _checkpoint_locked(self, run_id: str, task: TaskSpec, plan: PlanSpec, task_id: str, allowed_paths: list[str]) -> None:
         run = self.store.get(run_id)
         worktree = Path(run["worktree_path"])
         tag_name = f"codex-run/{run_id}/{task_id}"
