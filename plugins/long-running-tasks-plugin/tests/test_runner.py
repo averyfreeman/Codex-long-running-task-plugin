@@ -128,6 +128,40 @@ def test_start_preflight_failure_creates_no_persistent_run(tmp_path: Path, monke
     assert not list(store.locks_dir.glob("*.json"))
 
 
+def test_process_launch_failure_clears_stale_launcher_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    repo = make_repo(tmp_path)
+    store = RunStore(tmp_path / "runtime")
+    original_popen = subprocess.Popen
+
+    def fail_worker_launch(*args, **kwargs):
+        command = args[0] if args else kwargs.get("args", [])
+        if "long_running_tasks.worker" in " ".join(map(str, command)):
+            raise OSError("simulated missing worker interpreter")
+        return original_popen(*args, **kwargs)
+
+    monkeypatch.setattr(runner_module.subprocess, "Popen", fail_worker_launch)
+    manager = RunManager(
+        store=store,
+        worker_backend="process",
+        executor_factory=lambda: object(),
+    )
+
+    with pytest.raises(RunError, match="Unable to launch worker process"):
+        manager.start(str(repo), max_iterations=1)
+
+    records = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in store.runs_dir.glob("*.json")
+    ]
+    assert len(records) == 1
+    assert records[0]["status"] == "needs_recovery"
+    assert records[0]["worker_launch_pid"] is None
+    assert records[0]["worker_token"] is None
+    assert records[0]["worker_started_at"] is None
+
+
 def test_resume_reconstructs_legacy_snapshot_only_on_digest_match(tmp_path: Path):
     repo = make_repo(tmp_path)
     store = RunStore(tmp_path / "runtime")

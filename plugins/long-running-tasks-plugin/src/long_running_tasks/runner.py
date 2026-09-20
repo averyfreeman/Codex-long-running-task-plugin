@@ -661,6 +661,11 @@ class RunManager:
                         text=True,
                     )
                 except OSError as exc:
+                    failed_run = self.store.get(run_id)
+                    failed_run["worker_launch_pid"] = None
+                    failed_run["worker_token"] = None
+                    failed_run["worker_started_at"] = None
+                    self.store.write(failed_run)
                     self._set_status(run_id, "needs_recovery", reason=f"Unable to launch worker process: {exc}")
                     raise RunError(f"Unable to launch worker process: {exc}") from exc
                 self.store.record_worker_spawn(run_id, token, process.pid)
