@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import time
@@ -125,6 +126,38 @@ def test_start_preflight_failure_creates_no_persistent_run(tmp_path: Path, monke
     assert not list(store.runs_dir.glob("*.json"))
     assert not list((store.root / "worktrees").glob("*"))
     assert not list(store.locks_dir.glob("*.json"))
+
+
+def test_resume_reconstructs_legacy_snapshot_only_on_digest_match(tmp_path: Path):
+    repo = make_repo(tmp_path)
+    store = RunStore(tmp_path / "runtime")
+    task_text = (repo / "TASK.md").read_text(encoding="utf-8")
+    task_digest = runner_module._text_digest(task_text)
+    state_path = tmp_path / "legacy-state.json"
+    state = {
+        "version": 1,
+        "status": "failed",
+        "run_id": "legacy-run",
+        "task_snapshot_path": None,
+    }
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+    run = {
+        "run_id": "legacy-run",
+        "status": "failed",
+        "repo_path": str(repo),
+        "worktree_path": str(repo),
+        "task_digest": task_digest,
+        "task_snapshot_path": None,
+        "state_path": str(state_path),
+    }
+    manager = RunManager(store=store, executor_factory=WritingExecutor)
+
+    manager._ensure_task_snapshot(run)
+
+    snapshot = Path(run["task_snapshot_path"])
+    assert snapshot.is_file()
+    assert runner_module._text_digest(snapshot.read_text(encoding="utf-8")) == task_digest
+    assert json.loads(state_path.read_text(encoding="utf-8"))["task_snapshot_path"] == str(snapshot)
 
 
 def test_successful_slice_isolated_and_checkpointed(tmp_path: Path):

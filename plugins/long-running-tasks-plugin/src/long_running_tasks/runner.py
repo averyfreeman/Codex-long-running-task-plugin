@@ -358,6 +358,34 @@ class RunManager:
                 f"Codex {phase} command preflight failed for approval_mode={approval_mode!r}: {exc}"
             ) from exc
 
+    def _ensure_task_snapshot(self, run: dict) -> None:
+        """Reconstruct a missing legacy snapshot only after digest verification."""
+        snapshot_value = run.get("task_snapshot_path")
+        snapshot_path = Path(snapshot_value) if snapshot_value else None
+        if snapshot_path and snapshot_path.is_file():
+            if _text_digest(snapshot_path.read_text(encoding="utf-8")) != run["task_digest"]:
+                raise RunError("Immutable TASK.md snapshot is changed; refusing resume")
+            return
+
+        task_path = Path(run["worktree_path"]) / "TASK.md"
+        if not task_path.is_file():
+            raise RunError("Immutable TASK.md snapshot is missing and retained TASK.md is unavailable")
+        task_text = task_path.read_text(encoding="utf-8")
+        if _text_digest(task_text) != run["task_digest"]:
+            raise RunError("Immutable TASK.md snapshot is missing and retained TASK.md does not match the recorded digest")
+
+        snapshot_path = self.store.write_snapshot(run["run_id"], task_text, run["task_digest"])
+        run["task_snapshot_path"] = str(snapshot_path)
+        self.store.write(run)
+        state = _load_state(run)
+        state["task_snapshot_path"] = str(snapshot_path)
+        state["updated_at"] = utc_now()
+        _write_state(run, state)
+        self.store.append_log(
+            run["run_id"],
+            {"kind": "recovery", "message": "Reconstructed missing legacy TASK.md snapshot after digest verification"},
+        )
+
     def resume(self, run_id: str, *, approval_mode: str | None = None) -> dict:
         run = self.store.get(run_id)
         if run["status"] not in RESTARTABLE_STATUSES:
@@ -374,6 +402,7 @@ class RunManager:
             model=run.get("model"),
             session_id=run.get("session_id"),
         )
+        self._ensure_task_snapshot(run)
         self.store.acquire_repo_lock(run["repo_key"], run_id)
         state = _load_state(run)
         state["approval_mode"] = run["approval_mode"]

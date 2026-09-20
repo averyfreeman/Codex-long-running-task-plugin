@@ -13,6 +13,7 @@ from long_running_tasks.codex_exec import (
 )
 
 
+CODEX_EXECUTABLE = shutil.which("codex")
 MODES = ["policy", "on-request", "auto_review", "unattended", "never"]
 EXPECTED_INITIAL = {
     "policy": ["--sandbox", "workspace-write", "-c", "approval_policy=on-request"],
@@ -130,9 +131,15 @@ exit 0
     assert preflight_command(command, approval_mode="unattended", resume=False) == "codex-cli test"
 
 
-@pytest.mark.skipif(shutil.which("codex") is None, reason="Codex CLI is not installed")
+@pytest.mark.skipif(CODEX_EXECUTABLE is None, reason="Codex CLI is not installed")
 @pytest.mark.parametrize("mode", MODES)
-def test_installed_codex_accepts_each_command_matrix(tmp_path: Path, mode: str):
+def test_installed_codex_accepts_each_command_matrix(
+    tmp_path: Path,
+    mode: str,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    assert CODEX_EXECUTABLE is not None
+    monkeypatch.setenv("PATH", str(Path(CODEX_EXECUTABLE).parent))
     initial = build_exec_command(
         worktree=tmp_path / "worktree",
         output_file=tmp_path / "last.txt",
@@ -148,8 +155,10 @@ def test_installed_codex_accepts_each_command_matrix(tmp_path: Path, mode: str):
     assert preflight_command(resumed, approval_mode=mode, resume=True)
 
 
+@pytest.mark.skipif(CODEX_EXECUTABLE is None, reason="Codex CLI is not installed")
 def test_current_codex_rejects_the_legacy_combination(tmp_path: Path):
-    codex = shutil.which("codex")
+    assert CODEX_EXECUTABLE is not None
+    codex = CODEX_EXECUTABLE
     if codex is None:
         pytest.skip("Codex CLI is not installed")
     result = subprocess.run(
