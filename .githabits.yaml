@@ -1,0 +1,24 @@
+schema_version: 1.0.0
+version: 1
+profile: guided
+branch: main
+versioning: semver
+initial_tag: v0.1.0
+commit_style: conventional-commits
+semantic_release: false
+actions:
+  init: false
+  branch: false
+  stage: true
+  commit: true
+  tag: true
+  remote: false
+  push: true
+remote:
+  provider: github
+  owner: averyfreeman
+  name: Codex-long-running-task-plugin
+  visibility: public
+  alias: origin
+  status: configured
+  url: https://github.com/averyfreeman/Codex-long-running-task-plugin.git
