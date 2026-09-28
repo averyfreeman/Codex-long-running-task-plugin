@@ -10,26 +10,12 @@
   "created_at": "2026-09-28T16:37:28.248308+00:00",
   "current_item": null,
   "iteration": 1,
-  "last_checkpoint": null,
-  "pending_checkpoint": {
-    "all_complete": false,
-    "allowed_paths": [
-      ".codex-loop/state.json",
-      "PLAN.md",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/__init__.py",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/bundles/",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/installer.py",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/matt_tools.py",
-      "plugins/long-running-tasks-plugin/tests/test_matt_tools.py"
-    ],
-    "before_sha": "3bedd9e10689d0982f64e546697d6524cd7c65a7",
-    "implementation_commit": null,
-    "phase": "prepared",
-    "state_commit": null,
+  "last_checkpoint": {
+    "status": "complete",
     "tag": "codex-run/9527129a3166/T002",
-    "tag_target": null,
     "task_id": "T002"
   },
+  "pending_checkpoint": null,
   "plan_digest": "8fc9b73cd667c57695154eeb8dc51eb62da061ee7f5ecd92bb2d6610e3658330",
   "plan_shape_digest": "5f46e6efa8e6eb4c0a8d975fe4b969e58c2e6749e6120949f7aa80213328eb03",
   "reason": "running verification for T002",
@@ -37,10 +23,10 @@
   "resume_attempts": 1,
   "run_id": "9527129a3166",
   "session_id": "01a0e8e0-ea5a-73e1-8fae-092cbaa60cda",
-  "status": "checkpointing",
+  "status": "running",
   "task_digest": "e1d899d9cb64d7e6b029d04e8be1662656947ec68ea2be00f34b7a9fe80be311",
   "task_snapshot_path": "/Users/avery/.codex/long-running-tasks/snapshots/9527129a3166.TASK.md",
-  "updated_at": "2026-09-28T16:55:30.575876+00:00",
+  "updated_at": "2026-09-28T16:55:30.644168+00:00",
   "version": 2,
   "worktree_path": "/Users/avery/.codex/long-running-tasks/worktrees/9527129a3166"
 }
