@@ -4,29 +4,48 @@
   "branch": "codex/long-running/9527129a3166",
   "context_pressure": {
     "ratio": 1.0,
-    "summary": "/Users/avery/.codex/long-running-tasks/logs/9527129a3166/continuation-001.md"
+    "summary": "/Users/avery/.codex/long-running-tasks/logs/9527129a3166/continuation-002.md"
   },
-  "continuation_count": 1,
+  "continuation_count": 2,
   "created_at": "2026-09-28T16:37:28.248308+00:00",
   "current_item": null,
-  "iteration": 1,
+  "iteration": 2,
   "last_checkpoint": {
     "status": "complete",
     "tag": "codex-run/9527129a3166/T002",
     "task_id": "T002"
   },
-  "pending_checkpoint": null,
-  "plan_digest": "8fc9b73cd667c57695154eeb8dc51eb62da061ee7f5ecd92bb2d6610e3658330",
+  "pending_checkpoint": {
+    "all_complete": false,
+    "allowed_paths": [
+      ".codex-loop/state.json",
+      "PLAN.md",
+      "plugins/long-running-tasks-plugin/src/long_running_tasks/__init__.py",
+      "plugins/long-running-tasks-plugin/src/long_running_tasks/artifacts.py",
+      "plugins/long-running-tasks-plugin/src/long_running_tasks/markdown_snapshots.py",
+      "plugins/long-running-tasks-plugin/src/long_running_tasks/matt_artifacts.py",
+      "plugins/long-running-tasks-plugin/src/long_running_tasks/snapshots.py",
+      "plugins/long-running-tasks-plugin/tests/test_artifacts.py"
+    ],
+    "before_sha": "a018a7f4d02efc604947f49e4569aa805d6b2701",
+    "implementation_commit": null,
+    "phase": "prepared",
+    "state_commit": null,
+    "tag": "codex-run/9527129a3166/T003",
+    "tag_target": null,
+    "task_id": "T003"
+  },
+  "plan_digest": "dade5c1632099b117b8a0fffb178b2d7618e29acfcf704e7a618ed832ae2ec24",
   "plan_shape_digest": "5f46e6efa8e6eb4c0a8d975fe4b969e58c2e6749e6120949f7aa80213328eb03",
-  "reason": "running verification for T002",
+  "reason": "running verification for T003",
   "repo_path": "/Users/avery/build/low-level-tools/long-running-tasks-plugin",
   "resume_attempts": 1,
   "run_id": "9527129a3166",
   "session_id": "01a0e8e0-ea5a-73e1-8fae-092cbaa60cda",
-  "status": "running",
+  "status": "checkpointing",
   "task_digest": "e1d899d9cb64d7e6b029d04e8be1662656947ec68ea2be00f34b7a9fe80be311",
   "task_snapshot_path": "/Users/avery/.codex/long-running-tasks/snapshots/9527129a3166.TASK.md",
-  "updated_at": "2026-09-28T16:55:30.644168+00:00",
+  "updated_at": "2026-09-28T17:22:45.862903+00:00",
   "version": 2,
   "worktree_path": "/Users/avery/.codex/long-running-tasks/worktrees/9527129a3166"
 }
