@@ -6,11 +6,14 @@ import tempfile
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import fcntl
 
 from .state import utc_now
+
+if TYPE_CHECKING:
+    from .workflow import WorkflowRecord
 
 
 class StoreError(RuntimeError):
@@ -48,6 +51,7 @@ class RunStore:
         self.locks_dir = self.root / "locks"
         self.workers_dir = self.root / "workers"
         self.snapshots_dir = self.root / "snapshots"
+        self.workflows_dir = self.root / "workflows"
         self.runs_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         self.locks_dir.mkdir(parents=True, exist_ok=True)
@@ -69,6 +73,39 @@ class RunStore:
 
     def snapshot_path(self, run_id: str) -> Path:
         return self.snapshots_dir / f"{run_id}.TASK.md"
+
+    def workflow_path(self, workflow_id: str) -> Path:
+        """Return the canonical local path for a workflow record."""
+        return self.workflows_dir / f"{workflow_id}.json"
+
+    def create_workflow(self, record: "WorkflowRecord") -> "WorkflowRecord":
+        """Persist a validated workflow through the workflow store boundary."""
+        from .workflow import WorkflowStore
+
+        return WorkflowStore(self.root).create(record)
+
+    def write_workflow(
+        self,
+        record: "WorkflowRecord",
+        *,
+        expected_revision: int | None = None,
+    ) -> "WorkflowRecord":
+        """Atomically update a canonical workflow record."""
+        from .workflow import WorkflowStore
+
+        return WorkflowStore(self.root).save(record, expected_revision=expected_revision)
+
+    def get_workflow(self, workflow_id: str) -> "WorkflowRecord":
+        """Read and validate a canonical workflow record."""
+        from .workflow import WorkflowStore
+
+        return WorkflowStore(self.root).get(workflow_id)
+
+    def list_all_workflows(self) -> list["WorkflowRecord"]:
+        """Read all canonical workflow records from the local store."""
+        from .workflow import WorkflowStore
+
+        return WorkflowStore(self.root).list_all()
 
     def journal_path(self, run_id: str) -> Path:
         directory = self.logs_dir / run_id

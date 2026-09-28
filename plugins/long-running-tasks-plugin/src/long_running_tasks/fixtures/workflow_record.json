@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "workflow_id": "fixture-workflow-001",
+  "repo_path": "/tmp/long-running-tasks-fixture-repo",
+  "status": "failed",
+  "automation_mode": "serial",
+  "revision": 0,
+  "created_at": "2026-01-01T00:00:00+00:00",
+  "updated_at": "2026-01-01T00:00:00+00:00",
+  "nodes": [
+    {
+      "node_id": "triage-001",
+      "kind": "triage",
+      "status": "approved",
+      "title": "Approved triage",
+      "artifact": "fixtures/triage.md",
+      "current": true,
+      "approved": true,
+      "revision": 0,
+      "created_at": "2026-01-01T00:00:00+00:00",
+      "updated_at": "2026-01-01T00:00:00+00:00",
+      "provenance": {
+        "source_ref": "fixtures/triage.md",
+        "digest": "b3ccb7756570e7e071e5f8b3e9909f72914b5a29be77681565a42249ca56b259",
+        "algorithm": "sha256",
+        "captured_at": "2026-01-01T00:00:00+00:00",
+        "source_revision": "fixture-v1",
+        "metadata": {},
+        "immutable": true
+      },
+      "metadata": {}
+    },
+    {
+      "node_id": "spec-001",
+      "kind": "spec",
+      "status": "approved",
+      "title": "Approved workflow specification",
+      "artifact": "fixtures/spec.md",
+      "current": true,
+      "approved": true,
+      "revision": 0,
+      "created_at": "2026-01-01T00:00:00+00:00",
+      "updated_at": "2026-01-01T00:00:00+00:00",
+      "provenance": {
+        "source_ref": "fixtures/spec.md",
+        "digest": "54d80ff21b229a48b7d8aa92b4d76292983cd949e6984bfab2ff0c41c5e50d0b",
+        "algorithm": "sha256",
+        "captured_at": "2026-01-01T00:00:00+00:00",
+        "source_revision": "fixture-v1",
+        "metadata": {},
+        "immutable": true
+      },
+      "metadata": {}
+    },
+    {
+      "node_id": "ticket-001",
+      "kind": "ticket",
+      "status": "approved",
+      "title": "Implement the workflow record",
+      "artifact": "fixtures/ticket.md",
+      "current": true,
+      "approved": true,
+      "revision": 0,
+      "created_at": "2026-01-01T00:00:00+00:00",
+      "updated_at": "2026-01-01T00:00:00+00:00",
+      "provenance": {
+        "source_ref": "fixtures/ticket.md",
+        "digest": "257d17926c2430634a930a4baedbbbda334a346f19f3e812ab3590e667ac4aa9",
+        "algorithm": "sha256",
+        "captured_at": "2026-01-01T00:00:00+00:00",
+        "source_revision": "fixture-v1",
+        "metadata": {},
+        "immutable": true
+      },
+      "metadata": {}
+    },
+    {
+      "node_id": "ticket-002",
+      "kind": "ticket",
+      "status": "blocked",
+      "title": "Follow-up ticket",
+      "artifact": "fixtures/ticket.md#follow-up",
+      "current": true,
+      "approved": true,
+      "revision": 0,
+      "created_at": "2026-01-01T00:00:00+00:00",
+      "updated_at": "2026-01-01T00:00:00+00:00",
+      "provenance": {
+        "source_ref": "fixtures/ticket.md#follow-up",
+        "digest": "257d17926c2430634a930a4baedbbbda334a346f19f3e812ab3590e667ac4aa9",
+        "algorithm": "sha256",
+        "captured_at": "2026-01-01T00:00:00+00:00",
+        "source_revision": "fixture-v1",
+        "metadata": {},
+        "immutable": true
+      },
+      "metadata": {}
+    },
+    {
+      "node_id": "run-001",
+      "kind": "run",
+      "status": "failed",
+      "title": "Failed fixture run",
+      "artifact": "fixtures/run.json",
+      "current": true,
+      "approved": false,
+      "revision": 0,
+      "created_at": "2026-01-01T00:00:00+00:00",
+      "updated_at": "2026-01-01T00:00:00+00:00",
+      "provenance": {
+        "source_ref": "fixtures/run.json",
+        "digest": "1714997618bb6062e0c42b0bd54f8b090ed62f32f2255fcc309b63eee47277c8",
+        "algorithm": "sha256",
+        "captured_at": "2026-01-01T00:00:00+00:00",
+        "source_revision": "fixture-v1",
+        "metadata": {},
+        "immutable": true
+      },
+      "metadata": {
+        "recoverable": true,
+        "attempt": 1
+      }
+    }
+  ],
+  "edges": [
+    {"source": "triage-001", "target": "spec-001", "kind": "produces", "metadata": {}},
+    {"source": "spec-001", "target": "ticket-001", "kind": "produces", "metadata": {}},
+    {"source": "ticket-001", "target": "ticket-002", "kind": "blocks", "metadata": {}},
+    {"source": "ticket-001", "target": "run-001", "kind": "executes", "metadata": {}}
+  ],
+  "events": [],
+  "metadata": {"fixture": true}
+}
