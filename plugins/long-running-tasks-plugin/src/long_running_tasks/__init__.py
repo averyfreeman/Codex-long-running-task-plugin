@@ -4,6 +4,7 @@ __version__ = "0.1.2"
 
 from .workflow import (
     ArtifactProvenance,
+    AutomationMode,
     BlockerEdge,
     LifecycleEvent,
     Provenance,
@@ -17,6 +18,9 @@ from .workflow import (
     WorkflowStoreError,
     WorkflowTransitionError,
     WorkflowValidationError,
+    UnsupportedAutomationModeError,
+    UnsupportedParallelModeError,
+    UnsupportedParallelSchedulingError,
 )
 from .matt_tools import (
     BundleChecksumError,
@@ -97,9 +101,26 @@ from .snapshots import (
     render_markdown_snapshot,
     write_markdown_snapshot,
 )
+from .scheduler import (
+    FRONTIER_TICKET_STATUSES,
+    ParallelSchedulingUnsupportedError,
+    SOURCE_NODE_KINDS,
+    STALE_PROPAGATION_EDGE_KINDS,
+    Scheduler,
+    StaleWorkflowError,
+    WorkflowScheduler,
+    WorkflowSchedulingError,
+    eligible_ticket_nodes,
+    frontier,
+    propagate_stale,
+    schedule_next,
+    select_frontier,
+    select_serial_frontier,
+)
 
 __all__ = [
     "ArtifactProvenance",
+    "AutomationMode",
     "BlockerEdge",
     "LifecycleEvent",
     "Provenance",
@@ -113,6 +134,9 @@ __all__ = [
     "WorkflowStoreError",
     "WorkflowTransitionError",
     "WorkflowValidationError",
+    "UnsupportedAutomationModeError",
+    "UnsupportedParallelModeError",
+    "UnsupportedParallelSchedulingError",
     "BundleChecksumError",
     "BundleFile",
     "BundleManifest",
@@ -186,4 +210,18 @@ __all__ = [
     "SnapshotValidationError",
     "render_markdown_snapshot",
     "write_markdown_snapshot",
+    "FRONTIER_TICKET_STATUSES",
+    "ParallelSchedulingUnsupportedError",
+    "SOURCE_NODE_KINDS",
+    "STALE_PROPAGATION_EDGE_KINDS",
+    "Scheduler",
+    "StaleWorkflowError",
+    "WorkflowScheduler",
+    "WorkflowSchedulingError",
+    "eligible_ticket_nodes",
+    "frontier",
+    "propagate_stale",
+    "schedule_next",
+    "select_frontier",
+    "select_serial_frontier",
 ]

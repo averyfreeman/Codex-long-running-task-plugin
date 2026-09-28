@@ -14,6 +14,7 @@ import json
 import re
 from dataclasses import dataclass, field, replace
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -38,6 +39,17 @@ class WorkflowTransitionError(WorkflowValidationError):
     """Raised when a lifecycle transition is not allowed."""
 
 
+class UnsupportedAutomationModeError(WorkflowValidationError):
+    """Raised when a workflow requests an automation mode not implemented here."""
+
+
+class UnsupportedParallelSchedulingError(UnsupportedAutomationModeError):
+    """Raised because parallel scheduling is intentionally not implemented."""
+
+
+UnsupportedParallelModeError = UnsupportedParallelSchedulingError
+
+
 class WorkflowStoreError(WorkflowError):
     """Raised when a workflow record cannot be read or persisted safely."""
 
@@ -48,6 +60,13 @@ class WorkflowConflictError(WorkflowStoreError):
 
 NODE_KINDS = frozenset({"triage", "spec", "ticket", "run"})
 EDGE_KINDS = frozenset({"blocks", "derived_from", "produces", "executes", "supersedes", "references"})
+
+
+class AutomationMode(str, Enum):
+    """Explicit orchestration modes understood by the workflow interface."""
+
+    SERIAL = "serial"
+    PARALLEL = "parallel"
 
 WORKFLOW_STATUSES = frozenset(
     {
@@ -639,8 +658,14 @@ class WorkflowRecord:
             raise WorkflowValidationError("workflow.repo_path must be a local path")
         if self.status not in WORKFLOW_STATUSES:
             raise WorkflowValidationError(f"Unsupported workflow status: {self.status}")
-        if self.automation_mode != "serial":
-            raise WorkflowValidationError(
+        try:
+            automation_mode = AutomationMode(self.automation_mode)
+        except (TypeError, ValueError) as exc:
+            raise UnsupportedAutomationModeError(
+                f"Unsupported automation mode {self.automation_mode!r}; only serial scheduling is supported"
+            ) from exc
+        if automation_mode is not AutomationMode.SERIAL:
+            raise UnsupportedParallelSchedulingError(
                 f"Unsupported automation mode {self.automation_mode!r}; only serial scheduling is supported"
             )
         if not isinstance(self.schema_version, int) or self.schema_version != WORKFLOW_SCHEMA_VERSION:
@@ -750,11 +775,46 @@ class WorkflowRecord:
 
     @property
     def stale(self) -> bool:
-        return self.status == "stale" or any(node.is_stale for node in self.nodes)
+        return self.status == "stale" or any(
+            node.is_stale
+            for node in self.nodes
+        )
 
     @property
     def requires_reconciliation(self) -> bool:
         return self.stale
+
+    @property
+    def stale_source_nodes(self) -> tuple[WorkflowNode, ...]:
+        return tuple(
+            node
+            for node in self.nodes
+            if node.kind in {"triage", "spec", "ticket"}
+            and node.is_stale
+        )
+
+    def propagate_stale(
+        self,
+        *,
+        now: str | None = None,
+        reason: str = "stale source artifact requires reconciliation",
+    ) -> "WorkflowRecord":
+        """Return a copy with stale source dependencies propagated downstream."""
+
+        from .scheduler import propagate_stale
+
+        return propagate_stale(self, now=now, reason=reason)
+
+    def select_frontier(
+        self,
+        *,
+        automation_mode: str | AutomationMode | None = None,
+    ) -> tuple[WorkflowNode, ...]:
+        """Select the next serial frontier ticket without mutating this record."""
+
+        from .scheduler import select_frontier
+
+        return select_frontier(self, automation_mode=automation_mode)
 
     def _with_update(
         self,
@@ -929,6 +989,31 @@ def transition_node(
     now: str | None = None,
 ) -> WorkflowRecord:
     return record.transition_node(node_id, new_status, reason=reason, now=now)
+
+
+def select_frontier(
+    record: WorkflowRecord | Mapping[str, Any],
+    *,
+    automation_mode: str | AutomationMode | None = None,
+) -> tuple[WorkflowNode, ...]:
+    """Lazy workflow-module entry point for serial frontier selection."""
+
+    from .scheduler import select_frontier as _select_frontier
+
+    return _select_frontier(record, automation_mode=automation_mode)
+
+
+def propagate_stale(
+    record: WorkflowRecord | Mapping[str, Any],
+    *,
+    now: str | None = None,
+    reason: str = "stale source artifact requires reconciliation",
+) -> WorkflowRecord:
+    """Lazy workflow-module entry point for stale dependency propagation."""
+
+    from .scheduler import propagate_stale as _propagate_stale
+
+    return _propagate_stale(record, now=now, reason=reason)
 
 
 class WorkflowStore:
