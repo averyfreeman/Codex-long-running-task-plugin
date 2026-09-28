@@ -9,6 +9,14 @@ from .workflow import (
     WorkflowStore,
     WorkflowStoreError,
 )
+from .workflow_run import (
+    ExecutionProjection,
+    WorkflowExecutionError,
+    WorkflowExecutionProjection,
+    WorkflowExecutionValidationError,
+    WorkflowRunInput,
+    WorkflowRunProjection,
+)
 
 __all__ = [
     "ArtifactProvenance",
@@ -18,4 +26,10 @@ __all__ = [
     "WorkflowRecordStore",
     "WorkflowStore",
     "WorkflowStoreError",
+    "ExecutionProjection",
+    "WorkflowExecutionError",
+    "WorkflowExecutionProjection",
+    "WorkflowExecutionValidationError",
+    "WorkflowRunInput",
+    "WorkflowRunProjection",
 ]
