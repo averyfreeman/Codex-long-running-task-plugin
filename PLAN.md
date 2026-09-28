@@ -1,6 +1,6 @@
 # Implementation plan
 
-- [ ] T001: Add the versioned workflow record model, validation, atomic persistence, lifecycle transitions, provenance digests, and local fixtures.
+- [x] T001: Add the versioned workflow record model, validation, atomic persistence, lifecycle transitions, provenance digests, and local fixtures.
 - [ ] T002: Add the pinned matt-tools-three bundle manifest, installer modes, checksum verification, idempotence, and offline tests.
 - [ ] T003: Add local Matt artifact adapters and Markdown snapshot rendering for triage, spec, and ticket nodes.
 - [ ] T004: Add blocker-aware serial frontier selection, stale propagation, explicit automation modes, and unsupported-parallel handling.

@@ -1,0 +1,50 @@
+{
+  "approval_mode": "policy",
+  "base_sha": "24c5f292b5b58d681c89eb25d21ae3031733f18f",
+  "branch": "codex/long-running/f5b119609ecc",
+  "context_pressure": {
+    "ratio": 0.9036325,
+    "summary": "/Users/avery/.codex/long-running-tasks/logs/f5b119609ecc/continuation-001.md"
+  },
+  "continuation_count": 1,
+  "created_at": "2026-09-28T16:11:14.783386+00:00",
+  "current_item": null,
+  "iteration": 1,
+  "last_checkpoint": null,
+  "pending_checkpoint": {
+    "all_complete": false,
+    "allowed_paths": [
+      ".codex-loop/",
+      ".codex-loop/state.json",
+      "PLAN.md",
+      "plugins/long-running-tasks-plugin/pyproject.toml",
+      "plugins/long-running-tasks-plugin/src/long_running_tasks/__init__.py",
+      "plugins/long-running-tasks-plugin/src/long_running_tasks/fixtures.py",
+      "plugins/long-running-tasks-plugin/src/long_running_tasks/fixtures/",
+      "plugins/long-running-tasks-plugin/src/long_running_tasks/store.py",
+      "plugins/long-running-tasks-plugin/src/long_running_tasks/workflow.py",
+      "plugins/long-running-tasks-plugin/src/long_running_tasks/workflow_store.py",
+      "plugins/long-running-tasks-plugin/tests/test_workflow.py"
+    ],
+    "before_sha": "24c5f292b5b58d681c89eb25d21ae3031733f18f",
+    "implementation_commit": null,
+    "phase": "prepared",
+    "state_commit": null,
+    "tag": "codex-run/f5b119609ecc/T001",
+    "tag_target": null,
+    "task_id": "T001"
+  },
+  "plan_digest": "959209425c03c76880011ed9b1029495a42c4a127c2ca591643596f501c56cbb",
+  "plan_shape_digest": "5f46e6efa8e6eb4c0a8d975fe4b969e58c2e6749e6120949f7aa80213328eb03",
+  "reason": "running verification for T001",
+  "repo_path": "/Users/avery/build/low-level-tools/long-running-tasks-plugin",
+  "resume_attempts": 1,
+  "run_id": "f5b119609ecc",
+  "session_id": "01a0e8c8-e720-7391-a61f-b27b0794ce85",
+  "status": "checkpointing",
+  "task_digest": "4a0291d7afa35b1d49da2134baa734a22e69f77a5cd8bb8313e05416a338464d",
+  "task_snapshot_path": "/Users/avery/.codex/long-running-tasks/snapshots/f5b119609ecc.TASK.md",
+  "updated_at": "2026-09-28T16:30:36.859209+00:00",
+  "version": 2,
+  "worktree_path": "/Users/avery/.codex/long-running-tasks/worktrees/f5b119609ecc"
+}
