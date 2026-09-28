@@ -12,33 +12,10 @@
   "iteration": 2,
   "last_checkpoint": {
     "status": "complete",
-    "tag": "codex-run/aa237884ce53/T005",
-    "task_id": "T005"
-  },
-  "pending_checkpoint": {
-    "all_complete": false,
-    "allowed_paths": [
-      ".codex-loop/state.json",
-      "PLAN.md",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/__init__.py",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/cli.py",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/mcp_server.py",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/retention.py",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/runner.py",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/safety.py",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/store.py",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/workflow_control.py",
-      "plugins/long-running-tasks-plugin/tests/test_mcp.py",
-      "plugins/long-running-tasks-plugin/tests/test_workflow_operations.py"
-    ],
-    "before_sha": "8f4d9f5f163553abe00e76efca28b658eea421b2",
-    "implementation_commit": null,
-    "phase": "prepared",
-    "state_commit": null,
     "tag": "codex-run/aa237884ce53/T006",
-    "tag_target": null,
     "task_id": "T006"
   },
+  "pending_checkpoint": null,
   "plan_digest": "f2cfc9af659cd1c64e215397df1c81738c3fcfc19e7759b4181bbfa6502a8654",
   "plan_shape_digest": "5f46e6efa8e6eb4c0a8d975fe4b969e58c2e6749e6120949f7aa80213328eb03",
   "reason": "running verification for T006",
@@ -46,10 +23,10 @@
   "resume_attempts": 1,
   "run_id": "aa237884ce53",
   "session_id": "01a0e918-ab7b-72e0-b2cd-5996f6ffceaf",
-  "status": "checkpointing",
+  "status": "running",
   "task_digest": "e1d899d9cb64d7e6b029d04e8be1662656947ec68ea2be00f34b7a9fe80be311",
   "task_snapshot_path": "/Users/avery/.codex/long-running-tasks/snapshots/aa237884ce53.TASK.md",
-  "updated_at": "2026-09-28T18:19:13.378239+00:00",
+  "updated_at": "2026-09-28T18:19:13.467860+00:00",
   "version": 2,
   "worktree_path": "/Users/avery/.codex/long-running-tasks/worktrees/aa237884ce53"
 }
