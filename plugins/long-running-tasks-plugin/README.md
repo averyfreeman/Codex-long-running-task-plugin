@@ -11,6 +11,35 @@ gets an external retained worktree and a branch named
 modified. Runtime records, continuation summaries, and detailed logs stay
 outside the target repository.
 
+The workflow integration is documented in [Canonical workflow integration](docs/workflow.md).
+It preserves the direct runner and adds a local, serial-first coordination path
+for triage, specs, tickets, provenance, immutable execution projections, and
+reconciliation.
+
+## Choose an execution path
+
+Use direct `start_run` when the user has an explicit `TASK.md` / `PLAN.md` task
+and does not need source-artifact scheduling. Use the canonical workflow path
+when triage, spec, ticket, and run nodes should be linked in a local
+`WorkflowRecord`.
+
+```mermaid
+flowchart LR
+    D["direct start_run"] --> I["existing isolated runner"]
+    M["local Matt triage/spec/ticket"] --> W[("WorkflowRecord")]
+    W --> F["serial current + approved + unblocked ticket"]
+    F --> P["immutable execution projection"]
+    P --> I
+    I --> R["retained status, logs, checkpoint, recovery"]
+    R --> W
+    M -. "source digest drift" .-> C["reconcile before advancing"]
+    C -. "confirmed local record update" .-> W
+```
+
+Both paths use the same isolated runner and recovery controls. The canonical
+record and projections are external local runtime data; Matt source files and
+the base checkout remain read-only to orchestration.
+
 ## Prepare a repository
 
 The target must be a clean Git repository. Add a task definition with a goal,
@@ -98,6 +127,60 @@ Useful lifecycle calls are:
 Mutating tools require explicit confirmation where applicable. Cancellation may
 briefly return `cancelling` while the Codex and verification process groups
 exit; the repository lock remains held until the worker is gone.
+
+### Canonical workflow calls
+
+The workflow facade is intentionally small and serial-first:
+
+- `create_workflow` validates and idempotently registers a local record;
+- `schedule_workflow` returns at most one current, approved, unblocked ticket;
+- `start_workflow` binds that ticket to the existing isolated runner;
+- `get_workflow_projection` reads the immutable input snapshot captured for a run;
+- `reconcile_workflow` audits source digests and persists stale transitions only
+  with confirmation.
+
+`parallel` scheduling fails explicitly. When reconciliation finds a changed,
+missing, or unverifiable source artifact, it can mark the record stale; the
+scheduler then stops automatic advancement until reconciliation is reviewed.
+Failed, interrupted, paused, and `needs_recovery` runs retain their external
+worktree, logs, projection, and runtime record for inspection and recovery.
+
+The CLI exposes the same operations under `workflow`, for example:
+
+~~~sh
+uv run --locked long-running-tasks workflow create workflow.json
+uv run --locked long-running-tasks workflow schedule workflow-001
+uv run --locked long-running-tasks workflow start /absolute/path/to/repo \
+  --workflow-id workflow-001 --detach
+uv run --locked long-running-tasks workflow projection ab12cd34ef56
+uv run --locked long-running-tasks workflow reconcile workflow-001 --confirm
+~~~
+
+See [workflow.md](docs/workflow.md) for the record shape, ownership table,
+Mermaid lifecycle, and recovery boundaries.
+
+## Install the pinned Matt-tools bundle
+
+`matt-tools-three` contains exactly `skills/engineering/to-spec`,
+`skills/engineering/to-tickets`, and `skills/engineering/triage` from the
+pinned `git-bbq-matt-skills` source commit
+`64fb7a440ff4a5e0b3d82680b2d73c2b93e1f2fa`. The setup companion is recorded as
+a reference only. The default `bundled` mode is offline-capable, checksum
+verified, idempotent, and does not run repository setup:
+
+~~~python
+from pathlib import Path
+from long_running_tasks import install_matt_tools
+
+result = install_matt_tools(Path(".codex/skills/matt-tools"))
+print(result.source_commit, result.record_path)
+~~~
+
+Use `mode="sibling-checkout"` with an explicit pinned local checkout or
+`mode="explicit-fetch"` when network access is intentionally allowed. Every
+installation record includes the source repository, source commit, selected
+paths, content digests, and its own digest. Existing conflicting files are
+reported rather than overwritten.
 
 ## CLI examples
 
@@ -191,13 +274,15 @@ verification leaves changes available for inspection and creates no checkpoint.
 ~~~sh
 uv run --locked pytest
 uv lock --check
+PYTHONPATH=src python3 scripts/validate_integration.py
 uv run --with pyyaml python3 /Users/avery/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py .
 ~~~
 
 The local repository marketplace is at
-`../../.agents/plugins/marketplace.json`. The first release is Git-backed and
-pinned to a release tag; no automatic push, merge, or publish is performed by
-the runner.
+`../../.agents/plugins/marketplace.json`. Release metadata is synchronized at
+`0.2.0` across the plugin manifest, Python package, import version, lockfile,
+changelog, and marketplace pin `v0.2.0`. Tagging, publishing, and marketplace
+availability remain release-owner actions; the runner never performs them.
 
 ## Attribution and license
 
