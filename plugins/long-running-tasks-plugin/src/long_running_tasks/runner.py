@@ -42,6 +42,7 @@ from .git_ops import (
 )
 from .state import RESTARTABLE_STATUSES, TERMINAL_STATUSES, initial_state, transition, utc_now
 from .store import RunStore, StoreError, atomic_write_json
+from .safety import BranchWriteSafetyError, assert_run_write_safe
 from .task_spec import PlanSpec, TaskSpec, TaskSpecError, mark_item_complete, parse_plan, parse_task
 from .workflow import (
     Provenance,
@@ -332,6 +333,17 @@ class RunManager:
             base_sha = current_sha(root)
             create_worktree(root, worktree, branch, base_sha)
             worktree_created = True
+            try:
+                assert_run_write_safe(
+                    {
+                        "repo_path": str(root),
+                        "worktree_path": str(worktree),
+                        "branch": branch,
+                    },
+                    store_root=self.store.root,
+                )
+            except BranchWriteSafetyError as exc:
+                raise RunError(f"Runner worktree failed its branch-write safety gate: {exc}") from exc
             state_path = worktree / ".codex-loop" / "state.json"
             state = initial_state(
                 run_id=run_id,
@@ -525,6 +537,137 @@ class RunManager:
     def logs(self, run_id: str, *, limit: int = 100, cursor: str | None = None) -> dict:
         self.store.get(run_id)
         return self.store.read_logs(run_id, limit=limit, cursor=cursor)
+
+    def create_workflow(self, workflow: WorkflowRecord | Mapping[str, Any]) -> dict:
+        """Create or idempotently register a canonical local workflow."""
+        from .workflow_control import WorkflowController
+
+        return WorkflowController(self.store).create(workflow).to_dict()
+
+    def get_workflow(self, workflow_id: str) -> dict:
+        """Read one canonical local workflow record."""
+        from .workflow_control import WorkflowController
+
+        return WorkflowController(self.store).get(workflow_id).to_dict()
+
+    read_workflow = get_workflow
+
+    def list_workflows(
+        self,
+        repo_path: str | None = None,
+        *,
+        limit: int = 20,
+        cursor: str | None = None,
+    ) -> dict:
+        """List bounded canonical workflows using an opaque cursor."""
+        from .workflow_control import WorkflowController
+
+        return WorkflowController(self.store).list(repo_path, limit=limit, cursor=cursor)
+
+    def schedule_workflow(
+        self,
+        workflow_id: str,
+        *,
+        automation_mode: str | None = None,
+    ) -> dict:
+        """Return the read-only serial frontier for a canonical workflow."""
+        from .workflow_control import WorkflowController
+
+        return WorkflowController(self.store).schedule(
+            workflow_id,
+            automation_mode=automation_mode,
+        )
+
+    select_workflow_frontier = schedule_workflow
+
+    def reconcile_workflow(
+        self,
+        workflow_id: str,
+        *,
+        confirm: bool = False,
+        require_confirmation: bool = False,
+    ) -> dict:
+        """Audit source artifacts and optionally persist a stale transition."""
+        from .workflow_control import WorkflowController
+
+        return WorkflowController(self.store).reconcile(
+            workflow_id,
+            confirm=confirm,
+            require_confirmation=require_confirmation,
+        ).to_dict()
+
+    def retention_preview(
+        self,
+        *,
+        repo_path: str | None = None,
+        max_age_seconds: float | None = None,
+        max_runs: int | None = None,
+        policy: Mapping[str, Any] | None = None,
+    ) -> dict:
+        """Preview retention without deleting runtime artifacts."""
+        from .workflow_control import WorkflowController
+
+        return WorkflowController(self.store).retention_preview(
+            repo_path=repo_path,
+            max_age_seconds=max_age_seconds,
+            max_runs=max_runs,
+            policy=policy,
+        )
+
+    def prune_runs(
+        self,
+        *,
+        repo_path: str | None = None,
+        max_age_seconds: float | None = None,
+        max_runs: int | None = None,
+        policy: Mapping[str, Any] | None = None,
+        confirm: bool = False,
+    ) -> dict:
+        """Prune only explicitly confirmed, terminal runtime artifacts."""
+        from .workflow_control import WorkflowController
+
+        return WorkflowController(self.store).prune_runs(
+            repo_path=repo_path,
+            max_age_seconds=max_age_seconds,
+            max_runs=max_runs,
+            policy=policy,
+            confirm=confirm,
+        )
+
+    prune = prune_runs
+
+    def assert_branch_write_safe(
+        self,
+        run: str | Mapping[str, Any],
+        *,
+        target_path: str | Path | None = None,
+    ) -> str:
+        """Validate a persisted run's branch-owned write target."""
+        selected = self.store.get(run) if isinstance(run, str) else run
+        try:
+            target = assert_run_write_safe(
+                selected,
+                store_root=self.store.root,
+                target_path=target_path,
+            )
+        except BranchWriteSafetyError:
+            raise
+        return str(target)
+
+    def _validate_run_worktree(
+        self,
+        run: Mapping[str, Any],
+        *,
+        target_path: str | Path | None = None,
+    ) -> Path:
+        try:
+            return assert_run_write_safe(
+                run,
+                store_root=self.store.root,
+                target_path=target_path,
+            )
+        except BranchWriteSafetyError as exc:
+            raise RunError(f"Run branch-write safety gate rejected the target: {exc}") from exc
 
     def _attach_workflow_run(
         self,
@@ -775,6 +918,7 @@ class RunManager:
 
     def resume(self, run_id: str, *, approval_mode: str | None = None) -> dict:
         run = self.store.get(run_id)
+        self._validate_run_worktree(run)
         if run["status"] not in RESTARTABLE_STATUSES:
             raise RunError(f"Run {run_id} is not resumable from status {run['status']}")
         if self.store.worker_alive(run):
@@ -815,6 +959,7 @@ class RunManager:
             raise RunError("Cancellation requires confirm=true")
         with self.store.checkpoint_guard(run_id):
             run = self.store.get(run_id)
+            self._validate_run_worktree(run)
             if run["status"] in TERMINAL_STATUSES:
                 return run
             run["cancel_requested"] = True
@@ -856,6 +1001,7 @@ class RunManager:
         if not confirm:
             raise RunError("Recovery requires confirm=true")
         run = self.store.get(run_id)
+        self._validate_run_worktree(run)
         if self._worker_is_alive(run_id) or self.store.worker_alive(run):
             raise RunError("Run still has an active worker; cancel it or wait for it to exit before recovery")
         worktree = Path(run["worktree_path"])
@@ -1017,6 +1163,7 @@ class RunManager:
 
     def _start_worker(self, run_id: str) -> None:
         run = self.store.get(run_id)
+        self._validate_run_worktree(run)
         if self.store.worker_alive(run) or self._worker_is_alive(run_id):
             return
         with self._lock:
@@ -1098,6 +1245,17 @@ class RunManager:
         heartbeat_stop = threading.Event()
         heartbeat_thread: threading.Thread | None = None
         run = self.store.get(run_id)
+        try:
+            self._validate_run_worktree(run)
+        except RunError as exc:
+            # A tampered or legacy run must never cause the error path to
+            # write into the base checkout.  Keep the durable run record
+            # inspectable while leaving its versioned worktree state alone.
+            run["status"] = "needs_recovery"
+            run["reason"] = str(exc)
+            self.store.write(run)
+            self.store.append_log(run_id, {"kind": "safety_gate", "message": str(exc)})
+            return
         token = run.get("worker_token")
         if token and self.worker_backend == "inline":
             try:
@@ -1131,6 +1289,7 @@ class RunManager:
 
     def _worker(self, run_id: str) -> None:
         run = self.store.get(run_id)
+        self._validate_run_worktree(run)
         worktree = Path(run["worktree_path"])
         cancel_event = self._cancel_events.setdefault(run_id, threading.Event())
         executor = self.executor_factory()
@@ -1405,6 +1564,7 @@ selected plan item. The runner still owns verification, PLAN.md, commit, and tag
 
     def _checkpoint_locked(self, run_id: str, task: TaskSpec, plan: PlanSpec, task_id: str, allowed_paths: list[str]) -> None:
         run = self.store.get(run_id)
+        self._validate_run_worktree(run)
         worktree = Path(run["worktree_path"])
         tag_name = f"codex-run/{run_id}/{task_id}"
         existing = tag_target(worktree, tag_name)

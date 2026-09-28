@@ -168,6 +168,44 @@ class RunStore:
 
         return WorkflowStore(self.root).list_all()
 
+    def list_workflows(
+        self,
+        repo_path: str | None = None,
+        *,
+        limit: int = 20,
+        cursor: str | None = None,
+    ) -> dict:
+        """List bounded canonical workflow records using an opaque cursor."""
+        from .workflow_control import WorkflowController
+
+        return WorkflowController(self).list(repo_path, limit=limit, cursor=cursor)
+
+    def retention_preview(self, **kwargs: Any) -> dict:
+        """Preview a confirmation-gated runtime retention policy."""
+        from .retention import RetentionPolicy, preview_retention
+
+        policy = kwargs.pop("policy", None) or RetentionPolicy(
+            max_age_seconds=kwargs.pop("max_age_seconds", None),
+            max_runs=kwargs.pop("max_runs", None),
+        )
+        if not isinstance(policy, RetentionPolicy):
+            policy = RetentionPolicy.from_dict(policy)
+        return preview_retention(self, policy, **kwargs)
+
+    def prune_runs(self, **kwargs: Any) -> dict:
+        """Apply runtime retention only when the caller supplies confirm."""
+        from .retention import RetentionPolicy, prune_retention
+
+        policy = kwargs.pop("policy", None) or RetentionPolicy(
+            max_age_seconds=kwargs.pop("max_age_seconds", None),
+            max_runs=kwargs.pop("max_runs", None),
+        )
+        if not isinstance(policy, RetentionPolicy):
+            policy = RetentionPolicy.from_dict(policy)
+        return prune_retention(self, policy, **kwargs)
+
+    prune = prune_runs
+
     def journal_path(self, run_id: str) -> Path:
         directory = self.logs_dir / run_id
         directory.mkdir(parents=True, exist_ok=True)
