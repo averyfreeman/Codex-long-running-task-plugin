@@ -24,4 +24,3 @@ def sample_workflow_record() -> WorkflowRecord:
 
 
 __all__ = ["load_workflow_fixture", "sample_workflow_record"]
-
