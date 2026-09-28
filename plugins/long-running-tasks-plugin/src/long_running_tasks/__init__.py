@@ -126,6 +126,26 @@ from .workflow_run import (
     WorkflowRunInput,
     WorkflowRunProjection,
 )
+from .retention import (
+    PROTECTED_RUN_STATUSES,
+    RetentionError,
+    RetentionPolicy,
+    preview_retention,
+    prune_retention,
+)
+from .safety import (
+    BranchWriteGuard,
+    BranchWriteSafetyError,
+    RUNNER_BRANCH_PREFIX,
+    assert_branch_write_safe,
+    assert_run_write_safe,
+)
+from .workflow_control import (
+    ReconciliationConfirmationRequired,
+    WorkflowController,
+    WorkflowOperationError,
+    WorkflowReconciliationResult,
+)
 
 __all__ = [
     "ArtifactProvenance",
@@ -240,4 +260,18 @@ __all__ = [
     "WorkflowExecutionValidationError",
     "WorkflowRunInput",
     "WorkflowRunProjection",
+    "PROTECTED_RUN_STATUSES",
+    "RetentionError",
+    "RetentionPolicy",
+    "preview_retention",
+    "prune_retention",
+    "BranchWriteGuard",
+    "BranchWriteSafetyError",
+    "RUNNER_BRANCH_PREFIX",
+    "assert_branch_write_safe",
+    "assert_run_write_safe",
+    "ReconciliationConfirmationRequired",
+    "WorkflowController",
+    "WorkflowOperationError",
+    "WorkflowReconciliationResult",
 ]

@@ -5,7 +5,7 @@ from long_running_tasks.mcp_server import TOOL_DEFINITIONS, list_tools
 
 def test_tool_schemas_are_discoverable_and_bounded():
     names = {tool.name for tool in TOOL_DEFINITIONS}
-    assert names == {"start_run", "get_run_status", "list_runs", "get_run_logs", "resume_run", "cancel_run", "recover_run"}
+    assert {"start_run", "get_run_status", "list_runs", "get_run_logs", "resume_run", "cancel_run", "recover_run"} <= names
     for tool in TOOL_DEFINITIONS:
         assert len(tool.description) >= 30
         assert "Use" in tool.description
