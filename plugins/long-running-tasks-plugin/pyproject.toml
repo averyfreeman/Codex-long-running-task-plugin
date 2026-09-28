@@ -1,6 +1,6 @@
 [project]
 name = "long-running-tasks-plugin"
-version = "0.1.2"
+version = "0.2.0"
 description = "Isolated, verifiable, recoverable Codex task orchestration."
 readme = "README.md"
 authors = [{ name = "Avery Freeman" }]

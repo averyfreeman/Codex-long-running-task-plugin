@@ -1,23 +1,26 @@
 {
   "name": "long-running-tasks-plugin",
-  "version": "0.1.2",
-  "description": "Run explicit repository tasks as isolated, verifiable, recoverable Codex slices.",
+  "version": "0.2.0",
+  "description": "Run explicit repository tasks directly or through a local, serial-first workflow as isolated, verifiable, recoverable Codex slices.",
   "author": {
     "name": "Avery Freeman"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "Long-Running Tasks",
-    "shortDescription": "Run isolated, verifiable Codex task slices.",
-    "longDescription": "Long-Running Tasks orchestrates explicit TASK.md and PLAN.md work through isolated Git worktrees, verification gates, checkpoints, recovery, and async MCP status tools.",
+    "shortDescription": "Run or coordinate isolated, recoverable task slices.",
+    "longDescription": "Long-Running Tasks preserves the direct TASK.md/PLAN.md runner and adds a local serial-first workflow for triage, specs, tickets, provenance, immutable execution projections, reconciliation, checkpoints, and recovery.",
     "developerName": "Avery Freeman",
     "category": "Developer Tools",
     "capabilities": [
       "Async task orchestration",
       "Git checkpointing",
-      "Run recovery"
+      "Run recovery",
+      "Canonical workflow records",
+      "Provenance and stale-source reconciliation",
+      "Pinned offline Matt-tools bundle"
     ],
-    "defaultPrompt": "Use long-running task orchestration for this explicit repository task."
+    "defaultPrompt": "For explicit durable repository work, choose direct start_run or the local serial workflow; preserve isolated execution and inspect or recover retained runs without publishing changes."
   },
   "mcpServers": "./.mcp.json"
 }

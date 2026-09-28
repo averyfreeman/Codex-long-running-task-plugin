@@ -10,7 +10,7 @@
         "source": "git-subdir",
         "url": "https://github.com/averyfreeman/Codex-long-running-task-plugin.git",
         "path": "./plugins/long-running-tasks-plugin",
-        "ref": "v0.1.2"
+        "ref": "v0.2.0"
       },
       "policy": {
         "installation": "AVAILABLE",
