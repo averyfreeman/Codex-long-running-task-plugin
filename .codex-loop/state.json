@@ -1,32 +1,46 @@
 {
   "approval_mode": "policy",
-  "base_sha": "24c5f292b5b58d681c89eb25d21ae3031733f18f",
-  "branch": "codex/long-running/f5b119609ecc",
+  "base_sha": "3bedd9e10689d0982f64e546697d6524cd7c65a7",
+  "branch": "codex/long-running/9527129a3166",
   "context_pressure": {
-    "ratio": 0.9036325,
-    "summary": "/Users/avery/.codex/long-running-tasks/logs/f5b119609ecc/continuation-001.md"
+    "ratio": 1.0,
+    "summary": "/Users/avery/.codex/long-running-tasks/logs/9527129a3166/continuation-001.md"
   },
   "continuation_count": 1,
-  "created_at": "2026-09-28T16:11:14.783386+00:00",
+  "created_at": "2026-09-28T16:37:28.248308+00:00",
   "current_item": null,
   "iteration": 1,
-  "last_checkpoint": {
-    "status": "complete",
-    "tag": "codex-run/f5b119609ecc/T001",
-    "task_id": "T001"
+  "last_checkpoint": null,
+  "pending_checkpoint": {
+    "all_complete": false,
+    "allowed_paths": [
+      ".codex-loop/state.json",
+      "PLAN.md",
+      "plugins/long-running-tasks-plugin/src/long_running_tasks/__init__.py",
+      "plugins/long-running-tasks-plugin/src/long_running_tasks/bundles/",
+      "plugins/long-running-tasks-plugin/src/long_running_tasks/installer.py",
+      "plugins/long-running-tasks-plugin/src/long_running_tasks/matt_tools.py",
+      "plugins/long-running-tasks-plugin/tests/test_matt_tools.py"
+    ],
+    "before_sha": "3bedd9e10689d0982f64e546697d6524cd7c65a7",
+    "implementation_commit": null,
+    "phase": "prepared",
+    "state_commit": null,
+    "tag": "codex-run/9527129a3166/T002",
+    "tag_target": null,
+    "task_id": "T002"
   },
-  "pending_checkpoint": null,
-  "plan_digest": "959209425c03c76880011ed9b1029495a42c4a127c2ca591643596f501c56cbb",
+  "plan_digest": "8fc9b73cd667c57695154eeb8dc51eb62da061ee7f5ecd92bb2d6610e3658330",
   "plan_shape_digest": "5f46e6efa8e6eb4c0a8d975fe4b969e58c2e6749e6120949f7aa80213328eb03",
-  "reason": "running verification for T001",
+  "reason": "running verification for T002",
   "repo_path": "/Users/avery/build/low-level-tools/long-running-tasks-plugin",
   "resume_attempts": 1,
-  "run_id": "f5b119609ecc",
-  "session_id": "01a0e8c8-e720-7391-a61f-b27b0794ce85",
-  "status": "running",
-  "task_digest": "4a0291d7afa35b1d49da2134baa734a22e69f77a5cd8bb8313e05416a338464d",
-  "task_snapshot_path": "/Users/avery/.codex/long-running-tasks/snapshots/f5b119609ecc.TASK.md",
-  "updated_at": "2026-09-28T16:30:36.915547+00:00",
+  "run_id": "9527129a3166",
+  "session_id": "01a0e8e0-ea5a-73e1-8fae-092cbaa60cda",
+  "status": "checkpointing",
+  "task_digest": "e1d899d9cb64d7e6b029d04e8be1662656947ec68ea2be00f34b7a9fe80be311",
+  "task_snapshot_path": "/Users/avery/.codex/long-running-tasks/snapshots/9527129a3166.TASK.md",
+  "updated_at": "2026-09-28T16:55:30.575876+00:00",
   "version": 2,
-  "worktree_path": "/Users/avery/.codex/long-running-tasks/worktrees/f5b119609ecc"
+  "worktree_path": "/Users/avery/.codex/long-running-tasks/worktrees/9527129a3166"
 }
