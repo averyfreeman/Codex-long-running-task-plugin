@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "bundle_id": "matt-tools-three",
+  "version": 1,
+  "source_repository": "https://github.com/averyfreeman/git-bbq-matt-skills.git",
+  "source_commit": "64fb7a440ff4a5e0b3d82680b2d73c2b93e1f2fa",
+  "selected_paths": [
+    "skills/engineering/to-spec",
+    "skills/engineering/to-tickets",
+    "skills/engineering/triage"
+  ],
+  "companion_references": [
+    "skills/engineering/setup-matt-pocock-skills"
+  ],
+  "installer_modes": [
+    "bundled",
+    "explicit-fetch",
+    "sibling-checkout"
+  ],
+  "destination_layout": "flat-skill-directories",
+  "files": [
+    {
+      "source_path": "skills/engineering/to-spec/SKILL.md",
+      "bundle_path": "skills/engineering/to-spec/SKILL.md",
+      "sha256": "43ad9cf318e5e7d3d1fa360253a37021796dc87a0c2e595ad262661a10f85088"
+    },
+    {
+      "source_path": "skills/engineering/to-spec/agents/openai.yaml",
+      "bundle_path": "skills/engineering/to-spec/agents/openai.yaml",
+      "sha256": "1c5b4d1e3d8e52287ef19cc2742fdbbfae1914ac75d33af3e4c8174f08cc55bb"
+    },
+    {
+      "source_path": "skills/engineering/to-tickets/SKILL.md",
+      "bundle_path": "skills/engineering/to-tickets/SKILL.md",
+      "sha256": "e4dd5dcc0a279de17c59cce42a774c8d6636cff092058e7374668527646373cd"
+    },
+    {
+      "source_path": "skills/engineering/to-tickets/agents/openai.yaml",
+      "bundle_path": "skills/engineering/to-tickets/agents/openai.yaml",
+      "sha256": "21bc6215fffcd7614e9f772bb1760e87cc5fc7dcc707e7d282bc9414267a6090"
+    },
+    {
+      "source_path": "skills/engineering/triage/AGENT-BRIEF.md",
+      "bundle_path": "skills/engineering/triage/AGENT-BRIEF.md",
+      "sha256": "7f5f87fed3033df1b06e083c480f3e847b1fbb0647746b8a4c6a50f9f26ef44f"
+    },
+    {
+      "source_path": "skills/engineering/triage/OUT-OF-SCOPE.md",
+      "bundle_path": "skills/engineering/triage/OUT-OF-SCOPE.md",
+      "sha256": "1fbf9b432130c6380aa65813b55553cfda150309b27c595e183f8e335b8a190d"
+    },
+    {
+      "source_path": "skills/engineering/triage/SKILL.md",
+      "bundle_path": "skills/engineering/triage/SKILL.md",
+      "sha256": "588bbd5551ff35f436dcc917d7764a93d4b9a9433bc3d81ae8d789aff8f4d604"
+    },
+    {
+      "source_path": "skills/engineering/triage/agents/openai.yaml",
+      "bundle_path": "skills/engineering/triage/agents/openai.yaml",
+      "sha256": "2e683717720cf456d165d0bb1a68bb600d0b6a8ccb61841c172e50d26f95351c"
+    }
+  ],
+  "bundle_digest": "284d746d842f3a77ea27f4a0a0704a1ebc31bdb49dccac9c64fec5e05bb084ea",
+  "manifest_digest": "df502adefe2fc521b02b84808e72b46c7e71fd619165747581937e1fdc43faef"
+}
