@@ -6,5 +6,5 @@
 - [x] T004: Add blocker-aware serial frontier selection, stale propagation, explicit automation modes, and unsupported-parallel handling.
 - [x] T005: Integrate workflow run inputs and run-status projection with the existing isolated runner while preserving direct start_run behavior.
 - [x] T006: Add workflow MCP/CLI operations, retention controls, reconciliation, and safety gates for branch-owned writes.
-- [ ] T007: Add end-to-end fixtures, failure/recovery coverage, installer regression coverage, and format-benchmark scaffolding.
+- [x] T007: Add end-to-end fixtures, failure/recovery coverage, installer regression coverage, and format-benchmark scaffolding.
 - [ ] T008: Update plugin documentation, skill guidance, diagrams, release metadata, and validation checks for the integrated workflow.
