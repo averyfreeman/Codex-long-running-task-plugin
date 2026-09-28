@@ -117,6 +117,15 @@ from .scheduler import (
     select_frontier,
     select_serial_frontier,
 )
+from .workflow_run import (
+    ExecutionProjection,
+    WORKFLOW_EXECUTION_PROJECTION_VERSION,
+    WorkflowExecutionError,
+    WorkflowExecutionProjection,
+    WorkflowExecutionValidationError,
+    WorkflowRunInput,
+    WorkflowRunProjection,
+)
 
 __all__ = [
     "ArtifactProvenance",
@@ -224,4 +233,11 @@ __all__ = [
     "schedule_next",
     "select_frontier",
     "select_serial_frontier",
+    "ExecutionProjection",
+    "WORKFLOW_EXECUTION_PROJECTION_VERSION",
+    "WorkflowExecutionError",
+    "WorkflowExecutionProjection",
+    "WorkflowExecutionValidationError",
+    "WorkflowRunInput",
+    "WorkflowRunProjection",
 ]

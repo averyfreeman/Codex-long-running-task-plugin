@@ -70,9 +70,14 @@ def initial_state(
     approval_mode: str,
     base_sha: str,
     task_snapshot_path: str | None = None,
+    workflow_id: str | None = None,
+    workflow_node_id: str | None = None,
+    workflow_ticket_id: str | None = None,
+    workflow_projection_path: str | None = None,
+    workflow_projection_digest: str | None = None,
 ) -> dict:
     now = utc_now()
-    return {
+    state = {
         "version": 2,
         "run_id": run_id,
         "repo_path": repo_path,
@@ -94,3 +99,19 @@ def initial_state(
         "created_at": now,
         "updated_at": now,
     }
+    # Keep the direct runner's state shape stable.  Workflow-only fields are
+    # added only for a workflow-bound run, so existing consumers and records
+    # remain compatible with the original start_run contract.
+    workflow_values = {
+        "workflow_id": workflow_id,
+        "workflow_node_id": workflow_node_id,
+        "workflow_run_node_id": workflow_node_id,
+        "workflow_ticket_id": workflow_ticket_id,
+        "workflow_ticket_node_id": workflow_ticket_id,
+        "workflow_projection_path": workflow_projection_path,
+        "execution_projection_path": workflow_projection_path,
+        "workflow_projection_digest": workflow_projection_digest,
+        "execution_projection_digest": workflow_projection_digest,
+    }
+    state.update({key: value for key, value in workflow_values.items() if value is not None})
+    return state

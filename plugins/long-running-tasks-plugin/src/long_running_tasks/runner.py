@@ -12,7 +12,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable, Mapping
 
 from .codex_exec import (
     APPROVAL_MODES,
@@ -43,6 +43,17 @@ from .git_ops import (
 from .state import RESTARTABLE_STATUSES, TERMINAL_STATUSES, initial_state, transition, utc_now
 from .store import RunStore, StoreError, atomic_write_json
 from .task_spec import PlanSpec, TaskSpec, TaskSpecError, mark_item_complete, parse_plan, parse_task
+from .workflow import (
+    Provenance,
+    WorkflowEdge,
+    WorkflowNode,
+    WorkflowRecord,
+    WorkflowStoreError,
+    WorkflowTransitionError,
+    WorkflowValidationError,
+    validate_workflow_record,
+)
+from .workflow_run import WorkflowExecutionProjection
 
 
 class RunError(RuntimeError):
@@ -244,7 +255,44 @@ class RunManager:
         max_iterations: int | None = None,
         approval_mode: str = "policy",
         model: str | None = None,
+        workflow: WorkflowRecord | Mapping[str, Any] | str | None = None,
+        workflow_id: str | None = None,
+        ticket_id: str | None = None,
+        workflow_record: WorkflowRecord | Mapping[str, Any] | str | None = None,
+        workflow_ticket_id: str | None = None,
+        _workflow_record: WorkflowRecord | None = None,
+        _workflow_ticket_id: str | None = None,
     ) -> dict:
+        # ``start_run`` remains the direct runner contract.  Workflow callers
+        # can opt into the complementary binding through this convenience
+        # spelling, while the normal path below stays unchanged for existing
+        # callers and tests.
+        if workflow_record is not None:
+            if workflow is not None or workflow_id is not None:
+                raise RunError("Provide only one of workflow, workflow_id, or workflow_record")
+            workflow = workflow_record
+        if workflow_ticket_id is not None:
+            if ticket_id is not None:
+                raise RunError("Provide only one of ticket_id or workflow_ticket_id")
+            ticket_id = workflow_ticket_id
+        if workflow is not None or workflow_id is not None:
+            if workflow is not None and workflow_id is not None:
+                raise RunError("Provide either workflow or workflow_id, not both")
+            if _workflow_record is not None or _workflow_ticket_id is not None:
+                raise RunError("Internal workflow binding arguments cannot be combined with workflow")
+            selected_workflow = workflow if workflow is not None else workflow_id
+            return self.start_workflow(
+                repo_path,
+                selected_workflow,
+                ticket_id=ticket_id,
+                max_iterations=max_iterations,
+                approval_mode=approval_mode,
+                model=model,
+            )
+        if ticket_id is not None:
+            raise RunError("ticket_id requires a workflow binding")
+        if (_workflow_record is None) != (_workflow_ticket_id is None):
+            raise RunError("Internal workflow binding requires both a workflow record and ticket ID")
         if approval_mode not in APPROVAL_MODES:
             raise RunError(f"Unsupported approval mode: {approval_mode}")
         if max_iterations is not None and max_iterations < 1:
@@ -264,6 +312,17 @@ class RunManager:
         )
         repo_key = repository_key(root)
         run_id = uuid.uuid4().hex[:12]
+        projection: WorkflowExecutionProjection | None = None
+        projection_path: Path | None = None
+        workflow_node_id: str | None = None
+        if _workflow_record is not None:
+            projection = WorkflowExecutionProjection.from_workflow(
+                _workflow_record,
+                _workflow_ticket_id,
+                run_id=run_id,
+            )
+            projection_path = self.store.write_workflow_projection(run_id, projection)
+            workflow_node_id = f"run-{run_id}"
         snapshot_path = self.store.write_snapshot(run_id, task.text, task.digest)
         self.store.acquire_repo_lock(repo_key, run_id)
         worktree = self.store.root / "worktrees" / run_id
@@ -284,6 +343,11 @@ class RunManager:
                 approval_mode=approval_mode,
                 base_sha=base_sha,
                 task_snapshot_path=str(snapshot_path),
+                workflow_id=projection.workflow_id if projection else None,
+                workflow_node_id=workflow_node_id,
+                workflow_ticket_id=projection.ticket_id if projection else None,
+                workflow_projection_path=str(projection_path) if projection_path else None,
+                workflow_projection_digest=projection.digest if projection else None,
             )
             _write_state({"state_path": str(state_path)}, state)
             run = {
@@ -304,6 +368,39 @@ class RunManager:
                 "worker_launch_pid": None,
                 "worker_started_at": None,
             }
+            if projection is not None and projection_path is not None and workflow_node_id is not None:
+                run.update(
+                    {
+                        "workflow_id": projection.workflow_id,
+                        "workflow_node_id": workflow_node_id,
+                        "workflow_run_node_id": workflow_node_id,
+                        "workflow_ticket_id": projection.ticket_id,
+                        "workflow_ticket_node_id": projection.ticket_id,
+                        "workflow_projection_path": str(projection_path),
+                        "execution_projection_path": str(projection_path),
+                        "workflow_projection_digest": projection.digest,
+                        "execution_projection_digest": projection.digest,
+                        "workflow_record_digest": projection.workflow_digest,
+                        "workflow_record_revision": projection.workflow_revision,
+                        "workflow_projection": {
+                            "workflow_id": projection.workflow_id,
+                            "ticket_id": projection.ticket_id,
+                            "digest": projection.digest,
+                            "path": str(projection_path),
+                        },
+                    }
+                )
+                # Bind the canonical run node before a worker can advance the
+                # status.  This update is external runtime data and never
+                # touches the target repository checkout.
+                updated_workflow = self._attach_workflow_run(
+                    _workflow_record,
+                    projection,
+                    run_id=run_id,
+                    run_node_id=workflow_node_id,
+                    projection_path=projection_path,
+                )
+                run["workflow_record_revision"] = updated_workflow.revision
             self.store.create(run)
         except Exception:
             if worktree_created:
@@ -316,6 +413,109 @@ class RunManager:
         self._start_worker(run_id)
         return self.store.get(run_id)
 
+    def start_workflow(
+        self,
+        repo_path: str,
+        workflow: WorkflowRecord | Mapping[str, Any] | str | None = None,
+        *,
+        workflow_id: str | None = None,
+        ticket_id: str | None = None,
+        workflow_record: WorkflowRecord | Mapping[str, Any] | str | None = None,
+        ticket_node_id: str | None = None,
+        max_iterations: int | None = None,
+        approval_mode: str = "policy",
+        model: str | None = None,
+    ) -> dict:
+        """Start the existing isolated runner from a canonical workflow.
+
+        The workflow record is validated and persisted in the external run
+        store before the worker starts.  The selected ticket is captured into
+        a :class:`WorkflowExecutionProjection`; subsequent status updates
+        project onto a new workflow-record revision and never rewrite source
+        artifacts or the base checkout.
+        """
+        if workflow_record is not None:
+            if workflow is not None or workflow_id is not None:
+                raise RunError("Provide only one of workflow, workflow_id, or workflow_record")
+            workflow = workflow_record
+        if ticket_node_id is not None:
+            if ticket_id is not None:
+                raise RunError("Provide only one of ticket_id or ticket_node_id")
+            ticket_id = ticket_node_id
+        if workflow is not None and workflow_id is not None:
+            raise RunError("Provide either workflow or workflow_id, not both")
+        selected_workflow = workflow if workflow is not None else workflow_id
+        if selected_workflow is None:
+            raise RunError("start_workflow requires a workflow record or workflow_id")
+
+        if isinstance(selected_workflow, str):
+            try:
+                record = self.store.get_workflow(selected_workflow)
+            except (StoreError, WorkflowStoreError, WorkflowValidationError) as exc:
+                raise RunError(f"Unable to load workflow {selected_workflow}: {exc}") from exc
+        elif isinstance(selected_workflow, WorkflowRecord):
+            record = validate_workflow_record(selected_workflow)
+        elif isinstance(selected_workflow, Mapping):
+            try:
+                record = WorkflowRecord.from_dict(selected_workflow)
+            except WorkflowValidationError as exc:
+                raise RunError(f"Invalid workflow record: {exc}") from exc
+        else:
+            raise RunError("workflow must be a WorkflowRecord, mapping, or workflow ID")
+
+        root = repository_root(Path(repo_path).expanduser())
+        if Path(record.repo_path).expanduser().resolve() != root.resolve():
+            raise RunError(
+                f"Workflow {record.workflow_id} belongs to {record.repo_path}, not {root}"
+            )
+
+        # Fail closed on stale source artifacts and an empty frontier before
+        # creating any local canonical-record or runner state.
+        WorkflowExecutionProjection.from_workflow(record, ticket_id)
+
+        # An object/mapping supplied by a caller becomes the canonical record
+        # for this manager.  An ID always resolves to the already-persisted
+        # record above.  The digest check prevents accidentally projecting a
+        # different revision over an existing local workflow.
+        try:
+            stored = self.store.get_workflow(record.workflow_id)
+        except (StoreError, WorkflowStoreError, WorkflowValidationError):
+            self.store.create_workflow(record)
+            stored = record
+        if stored.digest != record.digest:
+            raise RunError(
+                f"Workflow {record.workflow_id} differs from the canonical local record"
+            )
+        record = stored
+
+        # Re-capture from the canonical stored revision.  The internal start
+        # call repeats this once more with the generated run_id so the
+        # persisted projection is tied to exactly one run.
+        projection = WorkflowExecutionProjection.from_workflow(record, ticket_id)
+        return self.start(
+            str(root),
+            max_iterations=max_iterations,
+            approval_mode=approval_mode,
+            model=model,
+            _workflow_record=record,
+            _workflow_ticket_id=projection.ticket_id,
+        )
+
+    start_workflow_run = start_workflow
+    start_from_workflow = start_workflow
+
+    def get_workflow_projection(self, run_id: str) -> WorkflowExecutionProjection:
+        """Read and validate the immutable projection bound to a workflow run."""
+        run = self.store.get(run_id)
+        if not run.get("workflow_projection_path") and not run.get("execution_projection_path"):
+            raise RunError(f"Run {run_id} is a direct run without a workflow projection")
+        try:
+            return WorkflowExecutionProjection.from_dict(self.store.read_workflow_projection(run_id))
+        except (OSError, StoreError, WorkflowValidationError) as exc:
+            raise RunError(f"Unable to read workflow projection for run {run_id}: {exc}") from exc
+
+    read_workflow_projection = get_workflow_projection
+
     def get(self, run_id: str) -> dict:
         return self.store.get(run_id)
 
@@ -325,6 +525,186 @@ class RunManager:
     def logs(self, run_id: str, *, limit: int = 100, cursor: str | None = None) -> dict:
         self.store.get(run_id)
         return self.store.read_logs(run_id, limit=limit, cursor=cursor)
+
+    def _attach_workflow_run(
+        self,
+        record: WorkflowRecord,
+        projection: WorkflowExecutionProjection,
+        *,
+        run_id: str,
+        run_node_id: str,
+        projection_path: Path,
+    ) -> WorkflowRecord:
+        """Add the external run node and execution edge to a record."""
+        if run_node_id in {node.node_id for node in record.nodes}:
+            raise RunError(f"Workflow run node already exists: {run_node_id}")
+
+        captured = projection.to_json()
+        timestamp = projection.captured_at or utc_now()
+        run_node = WorkflowNode(
+            node_id=run_node_id,
+            kind="run",
+            status="queued",
+            title=f"Run {run_id}: {projection.ticket.title}",
+            artifact=str(projection_path),
+            current=True,
+            approved=False,
+            created_at=timestamp,
+            updated_at=timestamp,
+            provenance=Provenance.from_text(
+                f"workflow://{projection.workflow_id}/runs/{run_id}",
+                captured,
+                captured_at=timestamp,
+                source_revision=str(projection.workflow_revision),
+                metadata={
+                    "projection_digest": projection.digest,
+                    "workflow_id": projection.workflow_id,
+                    "ticket_id": projection.ticket_id,
+                },
+            ),
+            metadata={
+                "run_id": run_id,
+                "workflow_id": projection.workflow_id,
+                "ticket_id": projection.ticket_id,
+                "projection_path": str(projection_path),
+                "projection_digest": projection.digest,
+                "recoverable": True,
+            },
+        )
+        updated = record.add_node(run_node, now=timestamp)
+        if not any(
+            edge.source == projection.ticket_id
+            and edge.target == run_node_id
+            and edge.kind == "executes"
+            for edge in updated.edges
+        ):
+            updated = updated.add_edge(
+                WorkflowEdge(
+                    source=projection.ticket_id,
+                    target=run_node_id,
+                    kind="executes",
+                    metadata={"projection_digest": projection.digest},
+                ),
+                now=timestamp,
+            )
+        if updated.status != "queued":
+            try:
+                updated = updated.transition(
+                    "queued",
+                    reason=f"workflow run {run_id} queued",
+                    now=timestamp,
+                )
+            except WorkflowTransitionError as exc:
+                raise RunError(
+                    f"Workflow {record.workflow_id} cannot enter queued status from {record.status}"
+                ) from exc
+        try:
+            return self.store.write_workflow(updated, expected_revision=record.revision)
+        except (StoreError, WorkflowStoreError) as exc:
+            raise RunError(f"Unable to bind run {run_id} to workflow {record.workflow_id}: {exc}") from exc
+
+    @staticmethod
+    def _workflow_status_for_run(run_status: str) -> str:
+        """Map detailed runner phases onto the aggregate workflow lifecycle."""
+        if run_status == "queued":
+            return "queued"
+        if run_status in {"running", "verifying", "checkpointing", "cancelling"}:
+            return "running"
+        if run_status in {"needs_approval", "paused"}:
+            return "paused"
+        if run_status == "failed":
+            return "failed"
+        if run_status == "interrupted":
+            return "interrupted"
+        if run_status == "needs_recovery":
+            return "needs_recovery"
+        if run_status == "completed":
+            return "completed"
+        if run_status == "cancelled":
+            return "cancelled"
+        raise RunError(f"Unsupported workflow projection status: {run_status}")
+
+    def _project_workflow_status(
+        self,
+        run_id: str,
+        run_status: str,
+        *,
+        reason: str | None = None,
+    ) -> None:
+        """Project a runner status onto its canonical run node.
+
+        Projection failures are logged but do not alter the direct runner's
+        state machine.  The retained run record and worktree therefore remain
+        inspectable/recoverable even if a concurrent workflow reconciliation
+        wins the optimistic revision check.
+        """
+        try:
+            run = self.store.get(run_id)
+            workflow_id = run.get("workflow_id")
+            run_node_id = run.get("workflow_node_id")
+            if not workflow_id or not run_node_id:
+                return
+            workflow = self.store.get_workflow(str(workflow_id))
+            current_node = workflow.node(str(run_node_id))
+            aggregate_status = self._workflow_status_for_run(run_status)
+            updated = workflow
+            timestamp = utc_now()
+            if current_node.status != run_status:
+                try:
+                    updated = updated.transition_node(
+                        str(run_node_id),
+                        run_status,
+                        reason=reason,
+                        now=timestamp,
+                    )
+                except WorkflowTransitionError as exc:
+                    self.store.append_log(
+                        run_id,
+                        {
+                            "kind": "workflow_projection_error",
+                            "message": f"Cannot project run status {current_node.status} -> {run_status}: {exc}",
+                        },
+                    )
+                    return
+            if updated.status != aggregate_status:
+                try:
+                    updated = updated.transition(
+                        aggregate_status,
+                        reason=reason or f"run {run_id} projected {run_status}",
+                        now=timestamp,
+                    )
+                except WorkflowTransitionError:
+                    # A workflow may be terminal or explicitly stale while a
+                    # retained run is being inspected.  The run node can still
+                    # be projected without forcing an aggregate transition.
+                    pass
+            if updated != workflow:
+                self.store.write_workflow(updated, expected_revision=workflow.revision)
+        except (StoreError, WorkflowStoreError, WorkflowValidationError, RunError) as exc:
+            try:
+                self.store.append_log(
+                    run_id,
+                    {"kind": "workflow_projection_error", "message": str(exc)},
+                )
+            except StoreError:
+                pass
+
+    def project_workflow_status(
+        self,
+        run_id: str,
+        status: str | None = None,
+        *,
+        reason: str | None = None,
+    ) -> WorkflowRecord:
+        """Synchronize one retained run's status and return its workflow."""
+        run = self.store.get(run_id)
+        if not run.get("workflow_id"):
+            raise RunError(f"Run {run_id} is a direct run without a workflow projection")
+        self._project_workflow_status(run_id, status or str(run["status"]), reason=reason)
+        return self.store.get_workflow(str(run["workflow_id"]))
+
+    sync_workflow_status = project_workflow_status
+    project_run_status = project_workflow_status
 
     def _preflight_codex(
         self,
@@ -426,6 +806,7 @@ class RunManager:
         run["worker_token"] = None
         run["worker_launch_pid"] = None
         self.store.write(run)
+        self._project_workflow_status(run_id, "queued", reason="workflow run resumed")
         self._start_worker(run_id)
         return self.store.get(run_id)
 
@@ -491,6 +872,11 @@ class RunManager:
             run = self.store.get(run_id)
             run["cancel_requested"] = False
             self.store.write(run)
+            self._project_workflow_status(
+                run_id,
+                "paused",
+                reason="Worker stopped before a checkpoint boundary; inspect the retained worktree",
+            )
             self.store.release_repo_lock(run["repo_key"], run_id)
             self.store.append_log(run_id, {"kind": "recovery", "message": "Paused safely before checkpoint boundary"})
             return self.store.get(run_id)
@@ -503,6 +889,7 @@ class RunManager:
             run["status"] = "paused"
             run["reason"] = "checkpoint boundary reconciled; continuing automatically"
             self.store.write(run)
+            self._project_workflow_status(run_id, "paused", reason=run["reason"])
             state = _load_state(run)
             if state.get("status") != "paused":
                 state["status"] = "paused"
@@ -619,6 +1006,7 @@ class RunManager:
         run["status"] = "completed" if all_complete else "running"
         run["reason"] = None
         self.store.write(run)
+        self._project_workflow_status(run_id, run["status"], reason="checkpoint reconciled")
         self.store.write_journal(run_id, {**pending, "phase": "complete", "tag_target": commit_sha})
         self.store.append_log(
             run_id,
@@ -687,6 +1075,7 @@ class RunManager:
         run["reason"] = reason
         self.store.write(run)
         if status == "needs_recovery" and (run.get("pending_checkpoint") or {}).get("state_commit"):
+            self._project_workflow_status(run_id, status, reason=reason)
             return
         state = _load_state(run)
         current = state.get("status")
@@ -703,6 +1092,7 @@ class RunManager:
             state["reason"] = reason
             state["updated_at"] = utc_now()
         _write_state(run, state)
+        self._project_workflow_status(run_id, status, reason=reason)
 
     def _worker_entry(self, run_id: str) -> None:
         heartbeat_stop = threading.Event()
@@ -925,6 +1315,26 @@ class RunManager:
 
     def _prompt(self, run: dict, task: TaskSpec, plan: PlanSpec, item) -> str:
         criteria = "\n".join(f"- {criterion}" for criterion in task.acceptance_criteria)
+        workflow_context = ""
+        if run.get("workflow_id"):
+            source_digests: dict[str, str] = {}
+            try:
+                projection = self.store.read_workflow_projection(run["run_id"])
+                source_digests = dict(projection.get("source_digests", {}))
+            except StoreError:
+                # The immutable projection is checked at start time.  Keep the
+                # prompt useful for a retained legacy run even if its external
+                # file was removed; status projection will record the issue.
+                source_digests = {}
+            workflow_context = f"""
+
+Workflow execution projection (immutable input; do not edit it):
+- Workflow: {run.get('workflow_id')}
+- Selected ticket: {run.get('workflow_ticket_id')}
+- Projection digest: {run.get('workflow_projection_digest')}
+- Source provenance digests: {json.dumps(source_digests, sort_keys=True)}
+- External projection path: {run.get('workflow_projection_path')}
+"""
         return f"""You are implementing one bounded slice of an orchestrated repository task.
 
 Repository worktree: {run['worktree_path']}
@@ -936,6 +1346,7 @@ Goal:
 
 Acceptance criteria:
 {criteria}
+{workflow_context}
 
 Rules:
 - Read the repository's AGENTS.md instructions before editing.
@@ -1028,6 +1439,7 @@ selected plan item. The runner still owns verification, PLAN.md, commit, and tag
         run["status"] = "checkpointing"
         run["pending_checkpoint"] = pending
         self.store.write(run)
+        self._project_workflow_status(run_id, "checkpointing", reason=f"checkpointing {task_id}")
         self.store.write_journal(run_id, pending)
         self.store.append_log(run_id, {"kind": "checkpointing", "task_id": task_id, "tag": tag_name})
         try:

@@ -57,6 +57,7 @@ class RunStore:
         self.locks_dir.mkdir(parents=True, exist_ok=True)
         self.workers_dir.mkdir(parents=True, exist_ok=True)
         self.snapshots_dir.mkdir(parents=True, exist_ok=True)
+        self.workflow_projections_dir = self.root / "workflow-projections"
 
     def run_path(self, run_id: str) -> Path:
         return self.runs_dir / f"{run_id}.json"
@@ -73,6 +74,66 @@ class RunStore:
 
     def snapshot_path(self, run_id: str) -> Path:
         return self.snapshots_dir / f"{run_id}.TASK.md"
+
+    def workflow_projection_path(self, run_id: str) -> Path:
+        """Return the external immutable projection path for a workflow run."""
+        return self.workflow_projections_dir / f"{run_id}.json"
+
+    execution_projection_path = workflow_projection_path
+
+    def write_workflow_projection(self, run_id: str, projection: Any) -> Path:
+        """Persist one workflow execution projection without overwriting it.
+
+        The projection is runtime data, not a repository input.  Keeping it
+        under the external run store means the base checkout remains untouched
+        and a later source-record update cannot rewrite what the run saw.
+        """
+        path = self.workflow_projection_path(run_id)
+        payload = projection.to_dict() if hasattr(projection, "to_dict") else projection
+        encoded = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            try:
+                existing = path.read_text(encoding="utf-8")
+            except OSError as exc:
+                raise StoreError(f"Unable to read workflow execution projection: {path}") from exc
+            if existing != encoded:
+                raise StoreError(
+                    f"Immutable workflow execution projection already exists with different content: {path}"
+                )
+            return path
+        descriptor = None
+        try:
+            descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                descriptor = None
+                handle.write(encoded)
+                handle.flush()
+                os.fsync(handle.fileno())
+        except FileExistsError:
+            # A concurrent idempotent writer may have won the race.  It is
+            # safe only when the bytes are exactly the same projection.
+            if path.read_text(encoding="utf-8") != encoded:
+                raise StoreError(
+                    f"Immutable workflow execution projection already exists with different content: {path}"
+                )
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)
+        return path
+
+    write_execution_projection = write_workflow_projection
+
+    def read_workflow_projection(self, run_id: str) -> dict:
+        path = self.workflow_projection_path(run_id)
+        if not path.is_file():
+            raise StoreError(f"Workflow execution projection does not exist: {path}")
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise StoreError(f"Corrupt workflow execution projection: {path}") from exc
+
+    read_execution_projection = read_workflow_projection
 
     def workflow_path(self, workflow_id: str) -> Path:
         """Return the canonical local path for a workflow record."""
