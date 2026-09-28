@@ -29,4 +29,4 @@ packages = ["src/long_running_tasks"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
-pythonpath = ["src"]
+pythonpath = ["src", "."]

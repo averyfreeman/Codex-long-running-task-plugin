@@ -529,7 +529,20 @@ class RunManager:
     read_workflow_projection = get_workflow_projection
 
     def get(self, run_id: str) -> dict:
-        return self.store.get(run_id)
+        run = self.store.get(run_id)
+        # A direct run's record is already the complete status surface.  For
+        # workflow-bound runs, make a status read a coherent recovery point:
+        # the worker persists its status before projecting the corresponding
+        # canonical run node, so callers must not observe a terminal runner
+        # record alongside a still-running workflow node.
+        if run.get("workflow_id") and run.get("workflow_node_id"):
+            self._project_workflow_status(
+                run_id,
+                str(run["status"]),
+                reason=run.get("reason"),
+            )
+            run = self.store.get(run_id)
+        return run
 
     def list(self, repo_path: str | None = None, *, limit: int = 20, cursor: str | None = None) -> dict:
         return self.store.list_runs(repo_path, limit=limit, cursor=cursor)
