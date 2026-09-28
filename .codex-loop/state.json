@@ -10,28 +10,12 @@
   "created_at": "2026-09-28T17:38:23.097496+00:00",
   "current_item": null,
   "iteration": 1,
-  "last_checkpoint": null,
-  "pending_checkpoint": {
-    "all_complete": false,
-    "allowed_paths": [
-      ".codex-loop/state.json",
-      "PLAN.md",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/__init__.py",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/runner.py",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/state.py",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/store.py",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/workflow_run.py",
-      "plugins/long-running-tasks-plugin/src/long_running_tasks/workflow_store.py",
-      "plugins/long-running-tasks-plugin/tests/test_workflow_run.py"
-    ],
-    "before_sha": "27c9ec82e213030059cfc27685dab9fda670d6ad",
-    "implementation_commit": null,
-    "phase": "prepared",
-    "state_commit": null,
+  "last_checkpoint": {
+    "status": "complete",
     "tag": "codex-run/aa237884ce53/T005",
-    "tag_target": null,
     "task_id": "T005"
   },
+  "pending_checkpoint": null,
   "plan_digest": "c2e56ea7b8c81dc1a3fe193fbdd3a1d6a590f25cd9611d5cae73e43fd1467b82",
   "plan_shape_digest": "5f46e6efa8e6eb4c0a8d975fe4b969e58c2e6749e6120949f7aa80213328eb03",
   "reason": "running verification for T005",
@@ -39,10 +23,10 @@
   "resume_attempts": 1,
   "run_id": "aa237884ce53",
   "session_id": "01a0e918-ab7b-72e0-b2cd-5996f6ffceaf",
-  "status": "checkpointing",
+  "status": "running",
   "task_digest": "e1d899d9cb64d7e6b029d04e8be1662656947ec68ea2be00f34b7a9fe80be311",
   "task_snapshot_path": "/Users/avery/.codex/long-running-tasks/snapshots/aa237884ce53.TASK.md",
-  "updated_at": "2026-09-28T17:59:10.302725+00:00",
+  "updated_at": "2026-09-28T17:59:10.366418+00:00",
   "version": 2,
   "worktree_path": "/Users/avery/.codex/long-running-tasks/worktrees/aa237884ce53"
 }
