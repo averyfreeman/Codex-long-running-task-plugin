@@ -26,6 +26,19 @@ recovery behavior.
 - Mermaid and workflow documentation describe the implemented ownership and
   lifecycle boundaries.
 
+## Scope constraints
+
+- The bundle ID `matt-tools-three` means exactly these source skill paths from
+  the separate `git-bbq-matt-skills` repository: `skills/engineering/to-spec`,
+  `skills/engineering/to-tickets`, and `skills/engineering/triage`.
+- `skills/engineering/setup-matt-pocock-skills` is a companion prerequisite
+  reference only. The installer must not execute repository setup implicitly,
+  and it must not substitute unrelated curated skills such as `debug`,
+  `design-project`, or `test-first` for the three bundle members.
+- The installer must record the source repository, source commit, selected
+  paths, and content digests, and support bundled, explicit-fetch, and
+  sibling-checkout modes without requiring network access in bundled mode.
+
 ## Verification
 
 ```sh
